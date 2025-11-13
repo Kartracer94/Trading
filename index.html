@@ -28,7 +28,6 @@
         setLoading(true);
         setError(null);
         try {
-          // Fetch OHLC data from Massive.com API
           const response = await fetch(
             `https://api.massive.com/v3/market/candles/${symbol}?timeframe=1D&limit=50&apiKey=${API_KEY}`
           );
@@ -43,7 +42,6 @@
             throw new Error('No data available for this ticker');
           }
           
-          // Transform API data to our format
           const candles = result.data.map(item => ({
             open: item.open,
             high: item.high,
@@ -109,22 +107,18 @@
         const lowerWick = Math.min(candle.close, candle.open) - candle.low;
         const range = candle.high - candle.low;
         
-        // Doji
         if (body < range * 0.1) {
           return { name: 'Doji', signal: 'NEUTRAL' };
         }
         
-        // Hammer
         if (candle.close > candle.open && lowerWick > body * 2 && upperWick < body * 0.3) {
           return { name: 'Hammer', signal: 'BULLISH' };
         }
         
-        // Shooting Star
         if (candle.close < candle.open && upperWick > body * 2 && lowerWick < body * 0.3) {
           return { name: 'Shooting Star', signal: 'BEARISH' };
         }
         
-        // Engulfing patterns would need previous candle
         if (candle.close > candle.open && body > range * 0.7) {
           return { name: 'Strong Bullish', signal: 'BULLISH' };
         }
@@ -144,12 +138,10 @@
           const before = candles.slice(i - 5, i);
           const after = candles.slice(i + 1, i + 6);
           
-          // Resistance
           if (before.every(c => c.high <= current.high) && after.every(c => c.high <= current.high)) {
             levels.push({ price: current.high, type: 'resistance' });
           }
           
-          // Support
           if (before.every(c => c.low >= current.low) && after.every(c => c.low >= current.low)) {
             levels.push({ price: current.low, type: 'support' });
           }
@@ -238,13 +230,9 @@
       };
 
       useEffect(() => {
-        if (dataSource === 'demo') {
-          const candles = generateData();
-          setData(candles);
-          setAnalysis(analyzeData(candles));
-        } else {
-          handleSearch();
-        }
+        const candles = generateData();
+        setData(candles);
+        setAnalysis(analyzeData(candles));
       }, []);
 
       const handleSearch = async () => {
@@ -336,8 +324,8 @@
               )}
             </div>
 
-            {analysis && !loading && (
-              <h2 className="text-xl font-semibold mb-2">Overall Signal</h2>
+            <div className={`p-8 rounded-lg shadow mb-8 border-2 ${getBg(analysis.overallSignal)}`}>
+              <h2 className="text-xl font-semibold mb-2">Overall Signal {dataSource === 'real' ? `- ${ticker}` : '(Demo)'}</h2>
               <div className={`text-5xl font-bold ${getColor(analysis.overallSignal)}`}>
                 {analysis.overallSignal}
               </div>
