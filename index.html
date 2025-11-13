@@ -237,17 +237,87 @@
           const prevHigh = highs[i - 1];
           
           if (currentHigh.price > prevHigh.price) {
-            structures.push({
-              ...currentHigh,
-              structure: 'HH', // Higher High
-              color: '#10b981' // Green
+            // This is a Higher High (HH)
+            // Check if HH price is within 5% of any more recent LH or LL
+            let shouldFlag = true;
+            
+            // Find all LH that came after this HH
+            const laterLowerHighs = highs.slice(i + 1).filter((h, idx) => {
+              const nextHigh = highs[i + 1 + idx];
+              return nextHigh && nextHigh.price < highs[i + idx].price;
             });
+            
+            // Find all LL that came after this HH
+            const laterLowerLows = lows.filter(l => l.time > currentHigh.time).filter((l, idx, arr) => {
+              if (idx === 0) return false;
+              return l.price < arr[idx - 1].price;
+            });
+            
+            // Check if within 5% of any later LH or LL
+            for (const lh of laterLowerHighs) {
+              if (Math.abs(currentHigh.price - lh.price) / currentHigh.price <= 0.05) {
+                shouldFlag = false;
+                break;
+              }
+            }
+            
+            if (shouldFlag) {
+              for (const ll of laterLowerLows) {
+                if (Math.abs(currentHigh.price - ll.price) / currentHigh.price <= 0.05) {
+                  shouldFlag = false;
+                  break;
+                }
+              }
+            }
+            
+            if (shouldFlag) {
+              structures.push({
+                ...currentHigh,
+                structure: 'HH',
+                color: '#10b981'
+              });
+            }
           } else if (currentHigh.price < prevHigh.price) {
-            structures.push({
-              ...currentHigh,
-              structure: 'LH', // Lower High
-              color: '#ef4444' // Red
+            // This is a Lower High (LH)
+            // Check if LH price is within 5% of any more recent HH or HL
+            let shouldFlag = true;
+            
+            // Find all HH that came after this LH
+            const laterHigherHighs = highs.slice(i + 1).filter((h, idx) => {
+              const nextHigh = highs[i + 1 + idx];
+              return nextHigh && nextHigh.price > highs[i + idx].price;
             });
+            
+            // Find all HL that came after this LH
+            const laterHigherLows = lows.filter(l => l.time > currentHigh.time).filter((l, idx, arr) => {
+              if (idx === 0) return false;
+              return l.price > arr[idx - 1].price;
+            });
+            
+            // Check if within 5% of any later HH or HL
+            for (const hh of laterHigherHighs) {
+              if (Math.abs(currentHigh.price - hh.price) / currentHigh.price <= 0.05) {
+                shouldFlag = false;
+                break;
+              }
+            }
+            
+            if (shouldFlag) {
+              for (const hl of laterHigherLows) {
+                if (Math.abs(currentHigh.price - hl.price) / currentHigh.price <= 0.05) {
+                  shouldFlag = false;
+                  break;
+                }
+              }
+            }
+            
+            if (shouldFlag) {
+              structures.push({
+                ...currentHigh,
+                structure: 'LH',
+                color: '#ef4444'
+              });
+            }
           }
         }
         
@@ -257,17 +327,87 @@
           const prevLow = lows[i - 1];
           
           if (currentLow.price > prevLow.price) {
-            structures.push({
-              ...currentLow,
-              structure: 'HL', // Higher Low
-              color: '#10b981' // Green
+            // This is a Higher Low (HL)
+            // Check if HL price is within 5% of any more recent LH or LL
+            let shouldFlag = true;
+            
+            // Find all LH that came after this HL
+            const laterLowerHighs = highs.filter(h => h.time > currentLow.time).filter((h, idx, arr) => {
+              if (idx === 0) return false;
+              return h.price < arr[idx - 1].price;
             });
+            
+            // Find all LL that came after this HL
+            const laterLowerLows = lows.slice(i + 1).filter((l, idx) => {
+              const nextLow = lows[i + 1 + idx];
+              return nextLow && nextLow.price < lows[i + idx].price;
+            });
+            
+            // Check if within 5% of any later LH or LL
+            for (const lh of laterLowerHighs) {
+              if (Math.abs(currentLow.price - lh.price) / currentLow.price <= 0.05) {
+                shouldFlag = false;
+                break;
+              }
+            }
+            
+            if (shouldFlag) {
+              for (const ll of laterLowerLows) {
+                if (Math.abs(currentLow.price - ll.price) / currentLow.price <= 0.05) {
+                  shouldFlag = false;
+                  break;
+                }
+              }
+            }
+            
+            if (shouldFlag) {
+              structures.push({
+                ...currentLow,
+                structure: 'HL',
+                color: '#10b981'
+              });
+            }
           } else if (currentLow.price < prevLow.price) {
-            structures.push({
-              ...currentLow,
-              structure: 'LL', // Lower Low
-              color: '#ef4444' // Red
+            // This is a Lower Low (LL)
+            // Check if LL price is within 5% of any more recent HH or HL
+            let shouldFlag = true;
+            
+            // Find all HH that came after this LL
+            const laterHigherHighs = highs.filter(h => h.time > currentLow.time).filter((h, idx, arr) => {
+              if (idx === 0) return false;
+              return h.price > arr[idx - 1].price;
             });
+            
+            // Find all HL that came after this LL
+            const laterHigherLows = lows.slice(i + 1).filter((l, idx) => {
+              const nextLow = lows[i + 1 + idx];
+              return nextLow && nextLow.price > lows[i + idx].price;
+            });
+            
+            // Check if within 5% of any later HH or HL
+            for (const hh of laterHigherHighs) {
+              if (Math.abs(currentLow.price - hh.price) / currentLow.price <= 0.05) {
+                shouldFlag = false;
+                break;
+              }
+            }
+            
+            if (shouldFlag) {
+              for (const hl of laterHigherLows) {
+                if (Math.abs(currentLow.price - hl.price) / currentLow.price <= 0.05) {
+                  shouldFlag = false;
+                  break;
+                }
+              }
+            }
+            
+            if (shouldFlag) {
+              structures.push({
+                ...currentLow,
+                structure: 'LL',
+                color: '#ef4444'
+              });
+            }
           }
         }
         
