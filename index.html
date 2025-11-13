@@ -8,9 +8,7 @@
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
-  <script src="https://unpkg.com/chartjs-chart-financial@0.1.1"></script>
+  <script src="https://unpkg.com/lightweight-charts@4.1.0/dist/lightweight-charts.standalone.production.js"></script>
 </head>
 <body>
   <div id="root"></div>
@@ -576,9 +574,7 @@
               <div className="text-sm text-gray-600 mb-4">
                 💡 <strong>Scroll</strong> to zoom in/out • <strong>Click & drag</strong> to pan left/right • <span className="text-green-600 font-semibold">Green</span> = bullish • <span className="text-red-600 font-semibold">Red</span> = bearish
               </div>
-              <div style={{height: '500px', position: 'relative'}}>
-                <canvas ref={chartRef}></canvas>
-              </div>
+              <div ref={chartRef} style={{height: '500px', position: 'relative'}}></div>
             </div>
           </div>
         </div>
