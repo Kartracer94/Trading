@@ -30,11 +30,11 @@
 
       const getTimeframeParams = (tf) => {
         const timeframes = {
-          '5min': { multiplier: 5, timespan: 'minute', days: 5 },
-          '15min': { multiplier: 15, timespan: 'minute', days: 7 },
-          'hour': { multiplier: 1, timespan: 'hour', days: 30 },
-          'day': { multiplier: 1, timespan: 'day', days: 50 },
-          'week': { multiplier: 1, timespan: 'week', days: 365 }
+          '5min': { multiplier: 5, timespan: 'minute', days: 10 },
+          '15min': { multiplier: 15, timespan: 'minute', days: 10 },
+          'hour': { multiplier: 1, timespan: 'hour', days: 90 },
+          'day': { multiplier: 1, timespan: 'day', days: 730 },
+          'week': { multiplier: 1, timespan: 'week', days: 730 }
         };
         return timeframes[tf];
       };
