@@ -24,9 +24,25 @@
       const [error, setError] = useState(null);
       const [dataSource, setDataSource] = useState('demo');
       const [timeframe, setTimeframe] = useState('day');
+      const [structureLookback, setStructureLookback] = useState('6months');
       const chartContainerRef = useRef(null);
       const chartRef = useRef(null);
       const API_KEY = '8sJBoZDCpg92UTI_7APnqoFRPWsIJ7oj';
+
+      const getLookbackDays = (period) => {
+        const periods = {
+          '5days': 5,
+          '10days': 10,
+          '15days': 15,
+          '1month': 30,
+          '3months': 90,
+          '6months': 180,
+          '9months': 270,
+          '1year': 365,
+          '2years': 730
+        };
+        return periods[period] || 180;
+      };
 
       const getTimeframeParams = (tf) => {
         const timeframes = {
@@ -202,12 +218,18 @@
         return swingPoints;
       };
 
-      const identifyStructureBreaks = (swingPoints) => {
+      const identifyStructureBreaks = (swingPoints, candles) => {
         const structures = [];
+        const lookbackDays = getLookbackDays(structureLookback);
+        const lookbackMs = lookbackDays * 24 * 60 * 60 * 1000;
+        const cutoffTime = Date.now() - lookbackMs;
+        
+        // Filter swing points within lookback period
+        const recentSwingPoints = swingPoints.filter(p => p.time >= cutoffTime);
         
         // Separate highs and lows
-        const highs = swingPoints.filter(p => p.type === 'high');
-        const lows = swingPoints.filter(p => p.type === 'low');
+        const highs = recentSwingPoints.filter(p => p.type === 'high');
+        const lows = recentSwingPoints.filter(p => p.type === 'low');
         
         // Identify Higher Highs and Lower Highs
         for (let i = 1; i < highs.length; i++) {
@@ -257,7 +279,7 @@
         const lastCandle = candles[candles.length - 1];
         const pattern = detectCandlePattern(lastCandle);
         const swingPoints = findSwingPoints(candles);
-        const structures = identifyStructureBreaks(swingPoints);
+        const structures = identifyStructureBreaks(swingPoints, candles);
         
         // Still find support/resistance for the summary cards
         const levels = swingPoints.filter(p => p.type === 'high' || p.type === 'low');
@@ -392,7 +414,19 @@
           timeScale: {
             borderColor: '#d1d4dc',
             timeVisible: showTime,
-            secondsVisible: false
+            secondsVisible: false,
+            lockVisibleTimeRangeOnResize: true
+          },
+          handleScroll: {
+            mouseWheel: true,
+            pressedMouseMove: true,
+            horzTouchDrag: true,
+            vertTouchDrag: true
+          },
+          handleScale: {
+            axisPressedMouseMove: true,
+            mouseWheel: true,
+            pinch: true
           }
         });
 
@@ -519,7 +553,7 @@
             </div>
 
             <div className="bg-white p-6 rounded-lg shadow mb-8">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Data Source</label>
                   <select 
@@ -557,6 +591,25 @@
                         <option value="hour">1 Hour</option>
                         <option value="day">Daily</option>
                         <option value="week">Weekly</option>
+                      </select>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Structure Lookback</label>
+                      <select 
+                        value={structureLookback} 
+                        onChange={(e) => setStructureLookback(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                      >
+                        <option value="5days">5 Days</option>
+                        <option value="10days">10 Days</option>
+                        <option value="15days">15 Days</option>
+                        <option value="1month">1 Month</option>
+                        <option value="3months">3 Months</option>
+                        <option value="6months">6 Months</option>
+                        <option value="9months">9 Months</option>
+                        <option value="1year">1 Year</option>
+                        <option value="2years">2 Years</option>
                       </select>
                     </div>
                   </>
