@@ -28,26 +28,37 @@
         setLoading(true);
         setError(null);
         try {
-          const response = await fetch(
-            `https://api.massive.com/v3/market/candles/${symbol}?timeframe=1D&limit=50&apiKey=${API_KEY}`
-          );
+          // Get date 50 days ago
+          const toDate = new Date();
+          const fromDate = new Date();
+          fromDate.setDate(toDate.getDate() - 50);
+          
+          const fromStr = fromDate.toISOString().split('T')[0];
+          const toStr = toDate.toISOString().split('T')[0];
+          
+          // Massive.com aggregates endpoint
+          const url = `https://api.massive.com/v2/aggs/ticker/${symbol}/range/1/day/${fromStr}/${toStr}?apiKey=${API_KEY}`;
+          
+          const response = await fetch(url);
           
           if (!response.ok) {
-            throw new Error('Failed to fetch data. Check if ticker symbol is valid.');
+            throw new Error('Failed to fetch data. Check if ticker is valid (e.g., AAPL, TSLA, MSFT)');
           }
           
           const result = await response.json();
+          console.log('API Response:', result);
           
-          if (!result.data || result.data.length === 0) {
+          if (!result.results || result.results.length === 0) {
             throw new Error('No data available for this ticker');
           }
           
-          const candles = result.data.map(item => ({
-            open: item.open,
-            high: item.high,
-            low: item.low,
-            close: item.close,
-            volume: item.volume || Math.random() * 1000000 + 500000
+          // Transform Massive.com data to our format
+          const candles = result.results.map(bar => ({
+            open: bar.o,
+            high: bar.h,
+            low: bar.l,
+            close: bar.c,
+            volume: bar.v || 0
           }));
           
           return candles;
