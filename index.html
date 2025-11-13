@@ -8,12 +8,14 @@
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
 </head>
 <body>
   <div id="root"></div>
   
   <script type="text/babel">
-    const { useState, useEffect } = React;
+    const { useState, useEffect, useRef } = React;
 
     const TradingApp = () => {
       const [data, setData] = useState([]);
@@ -23,6 +25,8 @@
       const [error, setError] = useState(null);
       const [dataSource, setDataSource] = useState('demo');
       const [timeframe, setTimeframe] = useState('day');
+      const chartRef = useRef(null);
+      const chartInstance = useRef(null);
       const API_KEY = '8sJBoZDCpg92UTI_7APnqoFRPWsIJ7oj';
 
       const getTimeframeParams = (tf) => {
@@ -263,6 +267,121 @@
         setAnalysis(analyzeData(candles));
       }, []);
 
+      useEffect(() => {
+        if (data.length > 0 && chartRef.current) {
+          createChart();
+        }
+        
+        return () => {
+          if (chartInstance.current) {
+            chartInstance.current.destroy();
+          }
+        };
+      }, [data]);
+
+      const createChart = () => {
+        if (chartInstance.current) {
+          chartInstance.current.destroy();
+        }
+
+        const ctx = chartRef.current.getContext('2d');
+        
+        const labels = data.map((_, i) => i);
+        const prices = data.map(d => d.close);
+        
+        chartInstance.current = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: labels,
+            datasets: [{
+              label: 'Price',
+              data: prices,
+              borderColor: '#3b82f6',
+              backgroundColor: 'rgba(59, 130, 246, 0.1)',
+              borderWidth: 2,
+              fill: true,
+              tension: 0.1,
+              pointRadius: 0,
+              pointHoverRadius: 5
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+              intersect: false,
+              mode: 'index'
+            },
+            plugins: {
+              legend: {
+                display: false
+              },
+              tooltip: {
+                callbacks: {
+                  label: function(context) {
+                    const candle = data[context.dataIndex];
+                    return [
+                      `Open: ${candle.open.toFixed(2)}`,
+                      `High: ${candle.high.toFixed(2)}`,
+                      `Low: ${candle.low.toFixed(2)}`,
+                      `Close: ${candle.close.toFixed(2)}`,
+                      `Volume: ${candle.volume.toLocaleString()}`
+                    ];
+                  }
+                }
+              },
+              zoom: {
+                zoom: {
+                  wheel: {
+                    enabled: true,
+                    speed: 0.1
+                  },
+                  pinch: {
+                    enabled: true
+                  },
+                  mode: 'x'
+                },
+                pan: {
+                  enabled: true,
+                  mode: 'x'
+                },
+                limits: {
+                  x: {min: 0, max: data.length - 1}
+                }
+              }
+            },
+            scales: {
+              x: {
+                display: true,
+                title: {
+                  display: true,
+                  text: 'Time Period'
+                },
+                grid: {
+                  color: 'rgba(0, 0, 0, 0.05)'
+                }
+              },
+              y: {
+                display: true,
+                title: {
+                  display: true,
+                  text: 'Price ($)'
+                },
+                grid: {
+                  color: 'rgba(0, 0, 0, 0.05)'
+                }
+              }
+            }
+          }
+        });
+      };
+
+      const resetZoom = () => {
+        if (chartInstance.current) {
+          chartInstance.current.resetZoom();
+        }
+      };
+
       const handleSearch = async () => {
         if (dataSource === 'real') {
           const candles = await fetchRealData(ticker);
@@ -438,6 +557,26 @@
                     </div>
                   </div>
                 ))}
+              </div>
+            </div>
+
+            <div className="mt-8 bg-white p-6 rounded-lg shadow">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-xl font-semibold">Interactive Price Chart</h3>
+                <div className="flex gap-2">
+                  <button 
+                    onClick={resetZoom}
+                    className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 text-sm"
+                  >
+                    Reset Zoom
+                  </button>
+                </div>
+              </div>
+              <div className="text-sm text-gray-600 mb-4">
+                💡 <strong>Scroll</strong> to zoom in/out • <strong>Click & drag</strong> to pan left/right
+              </div>
+              <div style={{height: '400px', position: 'relative'}}>
+                <canvas ref={chartRef}></canvas>
               </div>
             </div>
 
