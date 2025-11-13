@@ -163,31 +163,104 @@
         return { name: 'No Pattern', signal: 'NEUTRAL' };
       };
 
-      const findSupportResistance = (candles) => {
-        const levels = [];
+      const findSwingPoints = (candles) => {
+        const swingPoints = [];
+        const lookback = 5; // Number of candles to look back/forward for swing detection
         
-        for (let i = 5; i < candles.length - 5; i++) {
+        for (let i = lookback; i < candles.length - lookback; i++) {
           const current = candles[i];
-          const before = candles.slice(i - 5, i);
-          const after = candles.slice(i + 1, i + 6);
+          const leftCandles = candles.slice(i - lookback, i);
+          const rightCandles = candles.slice(i + 1, i + lookback + 1);
           
-          if (before.every(c => c.high <= current.high) && after.every(c => c.high <= current.high)) {
-            levels.push({ price: current.high, type: 'resistance' });
+          // Check for swing high (wick high is highest among surrounding candles)
+          const isSwingHigh = leftCandles.every(c => current.high >= c.high) && 
+                              rightCandles.every(c => current.high >= c.high);
+          
+          // Check for swing low (wick low is lowest among surrounding candles)
+          const isSwingLow = leftCandles.every(c => current.low <= c.low) && 
+                             rightCandles.every(c => current.low <= c.low);
+          
+          if (isSwingHigh) {
+            swingPoints.push({
+              index: i,
+              time: candles[i].time,
+              price: current.high,
+              type: 'high'
+            });
           }
           
-          if (before.every(c => c.low >= current.low) && after.every(c => c.low >= current.low)) {
-            levels.push({ price: current.low, type: 'support' });
+          if (isSwingLow) {
+            swingPoints.push({
+              index: i,
+              time: candles[i].time,
+              price: current.low,
+              type: 'low'
+            });
           }
         }
         
-        return levels;
+        return swingPoints;
+      };
+
+      const identifyStructureBreaks = (swingPoints) => {
+        const structures = [];
+        
+        // Separate highs and lows
+        const highs = swingPoints.filter(p => p.type === 'high');
+        const lows = swingPoints.filter(p => p.type === 'low');
+        
+        // Identify Higher Highs and Lower Highs
+        for (let i = 1; i < highs.length; i++) {
+          const currentHigh = highs[i];
+          const prevHigh = highs[i - 1];
+          
+          if (currentHigh.price > prevHigh.price) {
+            structures.push({
+              ...currentHigh,
+              structure: 'HH', // Higher High
+              color: '#10b981' // Green
+            });
+          } else if (currentHigh.price < prevHigh.price) {
+            structures.push({
+              ...currentHigh,
+              structure: 'LH', // Lower High
+              color: '#ef4444' // Red
+            });
+          }
+        }
+        
+        // Identify Higher Lows and Lower Lows
+        for (let i = 1; i < lows.length; i++) {
+          const currentLow = lows[i];
+          const prevLow = lows[i - 1];
+          
+          if (currentLow.price > prevLow.price) {
+            structures.push({
+              ...currentLow,
+              structure: 'HL', // Higher Low
+              color: '#10b981' // Green
+            });
+          } else if (currentLow.price < prevLow.price) {
+            structures.push({
+              ...currentLow,
+              structure: 'LL', // Lower Low
+              color: '#ef4444' // Red
+            });
+          }
+        }
+        
+        return structures;
       };
 
       const analyzeData = (candles) => {
         const macd = calculateMACD(candles);
         const lastCandle = candles[candles.length - 1];
         const pattern = detectCandlePattern(lastCandle);
-        const levels = findSupportResistance(candles);
+        const swingPoints = findSwingPoints(candles);
+        const structures = identifyStructureBreaks(swingPoints);
+        
+        // Still find support/resistance for the summary cards
+        const levels = swingPoints.filter(p => p.type === 'high' || p.type === 'low');
         
         const avgVolume = candles.reduce((sum, c) => sum + c.volume, 0) / candles.length;
         const volumeSignal = lastCandle.volume > avgVolume * 1.2 ? 'HIGH' : 
@@ -203,9 +276,9 @@
         else if (lastMacd < 0) macdSignal = 'BEARISH';
         
         const currentPrice = lastCandle.close;
-        const nearSupport = levels.filter(l => l.type === 'support' && l.price < currentPrice)
+        const nearSupport = levels.filter(l => l.type === 'low' && l.price < currentPrice)
           .sort((a, b) => b.price - a.price)[0];
-        const nearResistance = levels.filter(l => l.type === 'resistance' && l.price > currentPrice)
+        const nearResistance = levels.filter(l => l.type === 'high' && l.price > currentPrice)
           .sort((a, b) => a.price - b.price)[0];
         
         let score = 0;
@@ -258,7 +331,8 @@
           score,
           signals,
           avgVolume: avgVolume.toFixed(0),
-          currentVolume: lastCandle.volume.toFixed(0)
+          currentVolume: lastCandle.volume.toFixed(0),
+          structures // Add structure breaks to analysis
         };
       };
 
@@ -342,6 +416,43 @@
         }));
 
         candlestickSeries.setData(chartData);
+
+        // Add structure break lines (HH, HL, LH, LL)
+        if (analysis && analysis.structures) {
+          analysis.structures.forEach(structure => {
+            const structureTime = Math.floor(structure.time / 1000);
+            const lastTime = Math.floor(data[data.length - 1].time / 1000);
+            
+            // Create horizontal line from structure point to end of chart
+            const lineSeries = chart.addLineSeries({
+              color: structure.color,
+              lineWidth: 2,
+              lineStyle: window.LightweightCharts.LineStyle.Dashed,
+              crosshairMarkerVisible: false,
+              lastValueVisible: true,
+              priceLineVisible: false
+            });
+            
+            // Draw line from the structure point to the right edge
+            lineSeries.setData([
+              { time: structureTime, value: structure.price },
+              { time: lastTime, value: structure.price }
+            ]);
+            
+            // Add marker for the structure point
+            candlestickSeries.setMarkers([
+              ...candlestickSeries.markers() || [],
+              {
+                time: structureTime,
+                position: structure.type === 'high' ? 'aboveBar' : 'belowBar',
+                color: structure.color,
+                shape: structure.type === 'high' ? 'arrowDown' : 'arrowUp',
+                text: structure.structure
+              }
+            ]);
+          });
+        }
+
         chart.timeScale().fitContent();
 
         // Handle resize
@@ -555,6 +666,8 @@
               </div>
               <div className="text-sm text-gray-600 mb-4">
                 💡 <strong>Scroll</strong> to zoom in/out • <strong>Click & drag</strong> to pan • <span className="text-green-600 font-semibold">Green</span> = bullish • <span className="text-red-600 font-semibold">Red</span> = bearish
+                <br />
+                📊 <strong>HH</strong> = Higher High • <strong>HL</strong> = Higher Low • <strong>LH</strong> = Lower High • <strong>LL</strong> = Lower Low
               </div>
               <div ref={chartContainerRef} style={{width: '100%', height: '500px'}}></div>
               <div className="text-xs text-gray-500 mt-2">
