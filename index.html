@@ -49,6 +49,39 @@
         return periods[period] || 180;
       };
 
+      const calculateRiskReward = () => {
+        const entry = parseFloat(entryPrice);
+        const stop = parseFloat(stopLoss);
+        const target = parseFloat(profitTarget);
+        
+        if (!entry || !stop || !target) {
+          return {
+            riskAmount: 0,
+            rewardAmount: 0,
+            riskRewardRatio: 0,
+            shares: 0,
+            isValid: false
+          };
+        }
+        
+        const riskPerShare = Math.abs(entry - stop);
+        const rewardPerShare = Math.abs(target - entry);
+        const maxRiskDollars = positionSize * (riskPercent / 100);
+        const shares = maxRiskDollars / riskPerShare;
+        
+        const totalRisk = shares * riskPerShare;
+        const totalReward = shares * rewardPerShare;
+        const rrRatio = totalReward / totalRisk;
+        
+        return {
+          riskAmount: totalRisk,
+          rewardAmount: totalReward,
+          riskRewardRatio: rrRatio,
+          shares: shares,
+          isValid: true
+        };
+      };
+
       const getTimeframeParams = (tf) => {
         const timeframes = {
           '5min': { multiplier: 5, timespan: 'minute', days: 10 },
