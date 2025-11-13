@@ -563,7 +563,7 @@
 
             <div className="mt-8 bg-white p-6 rounded-lg shadow">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xl font-semibold">Interactive Price Chart</h3>
+                <h3 className="text-xl font-semibold">Interactive Candlestick Chart</h3>
                 <div className="flex gap-2">
                   <button 
                     onClick={resetZoom}
@@ -574,51 +574,10 @@
                 </div>
               </div>
               <div className="text-sm text-gray-600 mb-4">
-                💡 <strong>Scroll</strong> to zoom in/out • <strong>Click & drag</strong> to pan left/right
+                💡 <strong>Scroll</strong> to zoom in/out • <strong>Click & drag</strong> to pan left/right • <span className="text-green-600 font-semibold">Green</span> = bullish • <span className="text-red-600 font-semibold">Red</span> = bearish
               </div>
-              <div style={{height: '400px', position: 'relative'}}>
+              <div style={{height: '500px', position: 'relative'}}>
                 <canvas ref={chartRef}></canvas>
-              </div>
-            </div>
-
-            <div className="mt-8 bg-white p-6 rounded-lg shadow">
-              <h3 className="text-xl font-semibold mb-4">Recent Candles</h3>
-              <div className="flex gap-2 overflow-x-auto">
-                {data.slice(-20).map((candle, i) => {
-                  const isGreen = candle.close > candle.open;
-                  const bodyHeight = Math.abs(candle.close - candle.open);
-                  const wickTop = candle.high - Math.max(candle.close, candle.open);
-                  const wickBottom = Math.min(candle.close, candle.open) - candle.low;
-                  const maxRange = Math.max(...data.slice(-20).map(c => c.high - c.low));
-                  
-                  return (
-                    <div key={i} className="flex flex-col items-center" style={{minWidth: '20px'}}>
-                      <div className="relative" style={{height: '100px', width: '12px'}}>
-                        <div 
-                          className={`absolute w-full ${isGreen ? 'bg-green-500' : 'bg-red-500'}`}
-                          style={{
-                            height: `${(bodyHeight / maxRange) * 80}px`,
-                            bottom: `${((Math.min(candle.close, candle.open) - data.slice(-20).reduce((min, c) => Math.min(min, c.low), Infinity)) / maxRange) * 80}px`
-                          }}
-                        ></div>
-                        <div 
-                          className="absolute left-1/2 transform -translate-x-1/2 w-0.5 bg-gray-700"
-                          style={{
-                            height: `${(wickTop / maxRange) * 80}px`,
-                            bottom: `${((Math.max(candle.close, candle.open) - data.slice(-20).reduce((min, c) => Math.min(min, c.low), Infinity)) / maxRange) * 80}px`
-                          }}
-                        ></div>
-                        <div 
-                          className="absolute left-1/2 transform -translate-x-1/2 w-0.5 bg-gray-700"
-                          style={{
-                            height: `${(wickBottom / maxRange) * 80}px`,
-                            bottom: `${((candle.low - data.slice(-20).reduce((min, c) => Math.min(min, c.low), Infinity)) / maxRange) * 80}px`
-                          }}
-                        ></div>
-                      </div>
-                    </div>
-                  );
-                })}
               </div>
             </div>
           </div>
