@@ -8,7 +8,6 @@
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://unpkg.com/lightweight-charts@4.1.0/dist/lightweight-charts.standalone.production.js"></script>
 </head>
 <body>
   <div id="root"></div>
@@ -24,8 +23,7 @@
       const [error, setError] = useState(null);
       const [dataSource, setDataSource] = useState('demo');
       const [timeframe, setTimeframe] = useState('day');
-      const chartRef = useRef(null);
-      const chartInstance = useRef(null);
+      const canvasRef = useRef(null);
       const API_KEY = '8sJBoZDCpg92UTI_7APnqoFRPWsIJ7oj';
 
       const getTimeframeParams = (tf) => {
@@ -43,10 +41,7 @@
         setLoading(true);
         setError(null);
         try {
-          // Get timeframe parameters
           const tfParams = getTimeframeParams(timeframe);
-          
-          // Calculate date range based on timeframe
           const toDate = new Date();
           const fromDate = new Date();
           fromDate.setDate(toDate.getDate() - tfParams.days);
@@ -54,10 +49,7 @@
           const fromStr = fromDate.toISOString().split('T')[0];
           const toStr = toDate.toISOString().split('T')[0];
           
-          // Massive.com aggregates endpoint with dynamic timeframe
           const url = `https://api.massive.com/v2/aggs/ticker/${symbol}/range/${tfParams.multiplier}/${tfParams.timespan}/${fromStr}/${toStr}?adjusted=true&sort=asc&limit=50000&apiKey=${API_KEY}`;
-          
-          console.log('Fetching:', url);
           
           const response = await fetch(url);
           
@@ -66,13 +58,11 @@
           }
           
           const result = await response.json();
-          console.log('API Response:', result);
           
           if (!result.results || result.results.length === 0) {
             throw new Error('No data available for this ticker and timeframe');
           }
           
-          // Transform Massive.com data to our format
           const candles = result.results.map(bar => ({
             open: bar.o,
             high: bar.h,
@@ -267,118 +257,74 @@
       }, []);
 
       useEffect(() => {
-        if (data.length > 0 && chartRef.current) {
-          createChart();
+        if (data.length > 0 && canvasRef.current) {
+          drawCandlestickChart();
         }
-        
-        return () => {
-          if (chartInstance.current) {
-            chartInstance.current.destroy();
-          }
-        };
       }, [data]);
 
-      const createChart = () => {
-        if (chartInstance.current) {
-          chartInstance.current.destroy();
+      const drawCandlestickChart = () => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        
+        const ctx = canvas.getContext('2d');
+        const width = canvas.width;
+        const height = canvas.height;
+        
+        ctx.clearRect(0, 0, width, height);
+        
+        // Find price range
+        const highPrices = data.map(d => d.high);
+        const lowPrices = data.map(d => d.low);
+        const maxPrice = Math.max(...highPrices);
+        const minPrice = Math.min(...lowPrices);
+        const priceRange = maxPrice - minPrice;
+        
+        const padding = 40;
+        const chartHeight = height - padding * 2;
+        const chartWidth = width - padding * 2;
+        const candleWidth = Math.max(2, chartWidth / data.length - 2);
+        
+        // Draw grid
+        ctx.strokeStyle = '#e5e7eb';
+        ctx.lineWidth = 1;
+        for (let i = 0; i <= 5; i++) {
+          const y = padding + (chartHeight * i / 5);
+          ctx.beginPath();
+          ctx.moveTo(padding, y);
+          ctx.lineTo(width - padding, y);
+          ctx.stroke();
+          
+          const price = maxPrice - (priceRange * i / 5);
+          ctx.fillStyle = '#6b7280';
+          ctx.font = '12px sans-serif';
+          ctx.fillText('$' + price.toFixed(0), 5, y + 4);
         }
-
-        const ctx = chartRef.current.getContext('2d');
         
-        const labels = data.map((_, i) => i);
-        const prices = data.map(d => d.close);
-        
-        chartInstance.current = new Chart(ctx, {
-          type: 'line',
-          data: {
-            labels: labels,
-            datasets: [{
-              label: 'Price',
-              data: prices,
-              borderColor: '#3b82f6',
-              backgroundColor: 'rgba(59, 130, 246, 0.1)',
-              borderWidth: 2,
-              fill: true,
-              tension: 0.1,
-              pointRadius: 0,
-              pointHoverRadius: 5
-            }]
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            interaction: {
-              intersect: false,
-              mode: 'index'
-            },
-            plugins: {
-              legend: {
-                display: false
-              },
-              tooltip: {
-                callbacks: {
-                  label: function(context) {
-                    const candle = data[context.dataIndex];
-                    return [
-                      `Open: ${candle.open.toFixed(2)}`,
-                      `High: ${candle.high.toFixed(2)}`,
-                      `Low: ${candle.low.toFixed(2)}`,
-                      `Close: ${candle.close.toFixed(2)}`,
-                      `Volume: ${candle.volume.toLocaleString()}`
-                    ];
-                  }
-                }
-              },
-              zoom: {
-                zoom: {
-                  wheel: {
-                    enabled: true,
-                    speed: 0.1
-                  },
-                  pinch: {
-                    enabled: true
-                  },
-                  mode: 'x'
-                },
-                pan: {
-                  enabled: true,
-                  mode: 'x'
-                },
-                limits: {
-                  x: {min: 0, max: data.length - 1}
-                }
-              }
-            },
-            scales: {
-              x: {
-                display: true,
-                title: {
-                  display: true,
-                  text: 'Time Period'
-                },
-                grid: {
-                  color: 'rgba(0, 0, 0, 0.05)'
-                }
-              },
-              y: {
-                display: true,
-                title: {
-                  display: true,
-                  text: 'Price ($)'
-                },
-                grid: {
-                  color: 'rgba(0, 0, 0, 0.05)'
-                }
-              }
-            }
-          }
+        // Draw candlesticks
+        data.forEach((candle, i) => {
+          const x = padding + (i * (chartWidth / data.length)) + candleWidth / 2;
+          
+          const openY = padding + ((maxPrice - candle.open) / priceRange) * chartHeight;
+          const closeY = padding + ((maxPrice - candle.close) / priceRange) * chartHeight;
+          const highY = padding + ((maxPrice - candle.high) / priceRange) * chartHeight;
+          const lowY = padding + ((maxPrice - candle.low) / priceRange) * chartHeight;
+          
+          const isBullish = candle.close >= candle.open;
+          ctx.strokeStyle = isBullish ? '#10b981' : '#ef4444';
+          ctx.fillStyle = isBullish ? '#10b981' : '#ef4444';
+          
+          // Draw wick
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(x, highY);
+          ctx.lineTo(x, lowY);
+          ctx.stroke();
+          
+          // Draw body
+          const bodyTop = Math.min(openY, closeY);
+          const bodyHeight = Math.abs(closeY - openY);
+          ctx.fillRect(x - candleWidth / 2, bodyTop, candleWidth, Math.max(bodyHeight, 1));
         });
-      };
-
-      const resetZoom = () => {
-        if (chartInstance.current) {
-          chartInstance.current.resetZoom();
-        }
       };
 
       const handleSearch = async () => {
@@ -535,7 +481,7 @@
               </div>
             </div>
 
-            <div className="bg-white p-6 rounded-lg shadow">
+            <div className="bg-white p-6 rounded-lg shadow mb-8">
               <h3 className="text-xl font-semibold mb-4">Active Signals</h3>
               <div className="space-y-2">
                 {analysis.signals.map((sig, i) => (
@@ -559,22 +505,12 @@
               </div>
             </div>
 
-            <div className="mt-8 bg-white p-6 rounded-lg shadow">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xl font-semibold">Interactive Candlestick Chart</h3>
-                <div className="flex gap-2">
-                  <button 
-                    onClick={resetZoom}
-                    className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 text-sm"
-                  >
-                    Reset Zoom
-                  </button>
-                </div>
-              </div>
+            <div className="bg-white p-6 rounded-lg shadow">
+              <h3 className="text-xl font-semibold mb-4">Candlestick Chart</h3>
               <div className="text-sm text-gray-600 mb-4">
-                💡 <strong>Scroll</strong> to zoom in/out • <strong>Click & drag</strong> to pan left/right • <span className="text-green-600 font-semibold">Green</span> = bullish • <span className="text-red-600 font-semibold">Red</span> = bearish
+                <span className="text-green-600 font-semibold">Green</span> = bullish (close ≥ open) • <span className="text-red-600 font-semibold">Red</span> = bearish (close &lt; open)
               </div>
-              <div ref={chartRef} style={{height: '500px', position: 'relative'}}></div>
+              <canvas ref={canvasRef} width="1200" height="400" className="w-full border border-gray-200 rounded"></canvas>
             </div>
           </div>
         </div>
