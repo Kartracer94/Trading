@@ -66,6 +66,7 @@
           }
           
           const candles = result.results.map(bar => ({
+            time: bar.t, // Unix timestamp in milliseconds
             open: bar.o,
             high: bar.h,
             low: bar.l,
@@ -86,6 +87,8 @@
       const generateData = () => {
         const candles = [];
         let price = 45000;
+        const now = Date.now();
+        const dayInMs = 24 * 60 * 60 * 1000;
         
         for (let i = 0; i < 50; i++) {
           const change = (Math.random() - 0.5) * 1000;
@@ -95,7 +98,14 @@
           const low = Math.min(open, close) - Math.random() * 200;
           const volume = Math.random() * 1000000 + 500000;
           
-          candles.push({ open, high, low, close, volume });
+          candles.push({ 
+            time: now - ((49 - i) * dayInMs), // Unix timestamp in ms
+            open, 
+            high, 
+            low, 
+            close, 
+            volume 
+          });
           price = close;
         }
         return candles;
@@ -284,6 +294,9 @@
 
         const container = chartContainerRef.current;
         
+        // Determine time visibility based on timeframe
+        const showTime = timeframe === '5min' || timeframe === '15min' || timeframe === 'hour';
+        
         // Create chart
         const chart = window.LightweightCharts.createChart(container, {
           width: container.clientWidth,
@@ -304,7 +317,8 @@
           },
           timeScale: {
             borderColor: '#d1d4dc',
-            timeVisible: false
+            timeVisible: showTime,
+            secondsVisible: false
           }
         });
 
@@ -318,9 +332,9 @@
           wickDownColor: '#ef4444'
         });
 
-        // Format data for TradingView (needs time in seconds or date string)
-        const chartData = data.map((candle, i) => ({
-          time: i, // Using index as time
+        // Format data for TradingView - convert ms timestamp to seconds
+        const chartData = data.map((candle) => ({
+          time: Math.floor(candle.time / 1000), // Convert ms to seconds for TradingView
           open: candle.open,
           high: candle.high,
           low: candle.low,
