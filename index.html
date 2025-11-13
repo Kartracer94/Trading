@@ -22,22 +22,39 @@
       const [loading, setLoading] = useState(false);
       const [error, setError] = useState(null);
       const [dataSource, setDataSource] = useState('demo');
+      const [timeframe, setTimeframe] = useState('day');
       const API_KEY = '8sJBoZDCpg92UTI_7APnqoFRPWsIJ7oj';
+
+      const getTimeframeParams = (tf) => {
+        const timeframes = {
+          '5min': { multiplier: 5, timespan: 'minute', days: 5 },
+          '15min': { multiplier: 15, timespan: 'minute', days: 7 },
+          'hour': { multiplier: 1, timespan: 'hour', days: 30 },
+          'day': { multiplier: 1, timespan: 'day', days: 50 },
+          'week': { multiplier: 1, timespan: 'week', days: 365 }
+        };
+        return timeframes[tf];
+      };
 
       const fetchRealData = async (symbol) => {
         setLoading(true);
         setError(null);
         try {
-          // Get date 50 days ago
+          // Get timeframe parameters
+          const tfParams = getTimeframeParams(timeframe);
+          
+          // Calculate date range based on timeframe
           const toDate = new Date();
           const fromDate = new Date();
-          fromDate.setDate(toDate.getDate() - 50);
+          fromDate.setDate(toDate.getDate() - tfParams.days);
           
           const fromStr = fromDate.toISOString().split('T')[0];
           const toStr = toDate.toISOString().split('T')[0];
           
-          // Massive.com aggregates endpoint
-          const url = `https://api.massive.com/v2/aggs/ticker/${symbol}/range/1/day/${fromStr}/${toStr}?apiKey=${API_KEY}`;
+          // Massive.com aggregates endpoint with dynamic timeframe
+          const url = `https://api.massive.com/v2/aggs/ticker/${symbol}/range/${tfParams.multiplier}/${tfParams.timespan}/${fromStr}/${toStr}?adjusted=true&sort=asc&limit=50000&apiKey=${API_KEY}`;
+          
+          console.log('Fetching:', url);
           
           const response = await fetch(url);
           
@@ -49,7 +66,7 @@
           console.log('API Response:', result);
           
           if (!result.results || result.results.length === 0) {
-            throw new Error('No data available for this ticker');
+            throw new Error('No data available for this ticker and timeframe');
           }
           
           // Transform Massive.com data to our format
@@ -289,7 +306,7 @@
             </div>
 
             <div className="bg-white p-6 rounded-lg shadow mb-8">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Data Source</label>
                   <select 
@@ -303,16 +320,33 @@
                 </div>
                 
                 {dataSource === 'real' && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Ticker Symbol</label>
-                    <input
-                      type="text"
-                      value={ticker}
-                      onChange={(e) => setTicker(e.target.value.toUpperCase())}
-                      placeholder="AAPL, TSLA, MSFT..."
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-                    />
-                  </div>
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Ticker Symbol</label>
+                      <input
+                        type="text"
+                        value={ticker}
+                        onChange={(e) => setTicker(e.target.value.toUpperCase())}
+                        placeholder="AAPL, TSLA, MSFT..."
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Timeframe</label>
+                      <select 
+                        value={timeframe} 
+                        onChange={(e) => setTimeframe(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                      >
+                        <option value="5min">5 Minutes</option>
+                        <option value="15min">15 Minutes</option>
+                        <option value="hour">1 Hour</option>
+                        <option value="day">Daily</option>
+                        <option value="week">Weekly</option>
+                      </select>
+                    </div>
+                  </>
                 )}
                 
                 <div className="flex items-end">
@@ -336,7 +370,9 @@
             </div>
 
             <div className={`p-8 rounded-lg shadow mb-8 border-2 ${getBg(analysis.overallSignal)}`}>
-              <h2 className="text-xl font-semibold mb-2">Overall Signal {dataSource === 'real' ? `- ${ticker}` : '(Demo)'}</h2>
+              <h2 className="text-xl font-semibold mb-2">
+                Overall Signal {dataSource === 'real' ? `- ${ticker} (${timeframe.toUpperCase()})` : '(Demo)'}
+              </h2>
               <div className={`text-5xl font-bold ${getColor(analysis.overallSignal)}`}>
                 {analysis.overallSignal}
               </div>
