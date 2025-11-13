@@ -179,6 +179,68 @@
         return { name: 'No Pattern', signal: 'NEUTRAL' };
       };
 
+      const analyzeTrendStructure = (structures, candles) => {
+        if (!structures || structures.length === 0) {
+          return { trend: 'NEUTRAL', signal: 'No clear trend structure', description: 'Insufficient data to determine trend' };
+        }
+
+        const currentPrice = candles[candles.length - 1].close;
+        
+        // Find most recent structures
+        const recentLH = structures.filter(s => s.structure === 'LH').sort((a, b) => b.time - a.time)[0];
+        const recentHL = structures.filter(s => s.structure === 'HL').sort((a, b) => b.time - a.time)[0];
+        const recentHH = structures.filter(s => s.structure === 'HH').sort((a, b) => b.time - a.time);
+        const recentLL = structures.filter(s => s.structure === 'LL').sort((a, b) => b.time - a.time);
+        
+        // Bullish trend: Price breaks above a previous Lower High (LH)
+        if (recentLH && currentPrice > recentLH.price) {
+          return {
+            trend: 'BULLISH',
+            signal: 'Bullish Structure Break',
+            description: `Price broke above LH at ${recentLH.price.toFixed(2)}, indicating potential uptrend`
+          };
+        }
+        
+        // Bearish trend: Price breaks below a previous Higher Low (HL)
+        if (recentHL && currentPrice < recentHL.price) {
+          return {
+            trend: 'BEARISH',
+            signal: 'Bearish Structure Break',
+            description: `Price broke below HL at ${recentHL.price.toFixed(2)}, indicating potential downtrend`
+          };
+        }
+        
+        // Check overall structure pattern for trend
+        const hasRecentHH = recentHH.length > 0 && recentHH[0].time > Date.now() - (30 * 24 * 60 * 60 * 1000);
+        const hasRecentHL = recentHL && recentHL.time > Date.now() - (30 * 24 * 60 * 60 * 1000);
+        const hasRecentLH = recentLH && recentLH.time > Date.now() - (30 * 24 * 60 * 60 * 1000);
+        const hasRecentLL = recentLL.length > 0 && recentLL[0].time > Date.now() - (30 * 24 * 60 * 60 * 1000);
+        
+        // Higher Highs and Higher Lows = Uptrend
+        if (hasRecentHH && hasRecentHL) {
+          return {
+            trend: 'BULLISH',
+            signal: 'Uptrend Structure',
+            description: 'Series of Higher Highs and Higher Lows forming'
+          };
+        }
+        
+        // Lower Highs and Lower Lows = Downtrend
+        if (hasRecentLH && hasRecentLL) {
+          return {
+            trend: 'BEARISH',
+            signal: 'Downtrend Structure',
+            description: 'Series of Lower Highs and Lower Lows forming'
+          };
+        }
+        
+        return {
+          trend: 'NEUTRAL',
+          signal: 'Consolidation',
+          description: 'No clear trend structure - market consolidating'
+        };
+      };
+
       const findSwingPoints = (candles) => {
         const swingPoints = [];
         const lookback = 5; // Number of candles to look back/forward for swing detection
@@ -794,16 +856,15 @@
               </div>
 
               <div className="bg-white p-6 rounded-lg shadow">
-                <h3 className="text-xl font-semibold mb-4">Volume Analysis</h3>
-                <div className="text-2xl font-bold text-purple-600 mb-2">{analysis.volumeSignal}</div>
-                <div className="text-sm text-gray-600">Current: {analysis.currentVolume}</div>
-                <div className="text-sm text-gray-600">Average: {analysis.avgVolume}</div>
-              </div>
-
-              <div className="bg-white p-6 rounded-lg shadow">
-                <h3 className="text-xl font-semibold mb-4">Candlestick Pattern</h3>
-                <div className="text-2xl font-bold text-orange-600 mb-2">{analysis.pattern.name}</div>
-                <div className={`text-lg ${getColor(analysis.pattern.signal)}`}>{analysis.pattern.signal}</div>
+                <h3 className="text-xl font-semibold mb-4">Trend Structure Analysis</h3>
+                <div className={`text-2xl font-bold mb-2 ${
+                  analysis.trendStructure.trend === 'BULLISH' ? 'text-green-600' :
+                  analysis.trendStructure.trend === 'BEARISH' ? 'text-red-600' :
+                  'text-gray-600'
+                }`}>
+                  {analysis.trendStructure.signal}
+                </div>
+                <p className="text-gray-600">{analysis.trendStructure.description}</p>
               </div>
 
               <div className="bg-white p-6 rounded-lg shadow">
