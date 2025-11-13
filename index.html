@@ -25,6 +25,11 @@
       const [dataSource, setDataSource] = useState('demo');
       const [timeframe, setTimeframe] = useState('day');
       const [structureLookback, setStructureLookback] = useState('6months');
+      const [positionSize, setPositionSize] = useState(10000);
+      const [riskPercent, setRiskPercent] = useState(2);
+      const [entryPrice, setEntryPrice] = useState('');
+      const [stopLoss, setStopLoss] = useState('');
+      const [profitTarget, setProfitTarget] = useState('');
       const chartContainerRef = useRef(null);
       const chartRef = useRef(null);
       const API_KEY = '8sJBoZDCpg92UTI_7APnqoFRPWsIJ7oj';
@@ -560,7 +565,43 @@
         };
       };
 
+      const calculateRiskReward = () => {
+        const entry = parseFloat(entryPrice);
+        const stop = parseFloat(stopLoss);
+        const target = parseFloat(profitTarget);
+        
+        if (!entry || !stop || !target) {
+          return {
+            riskAmount: 0,
+            rewardAmount: 0,
+            riskRewardRatio: 0,
+            isValid: false
+          };
+        }
+        
+        const riskPerShare = Math.abs(entry - stop);
+        const rewardPerShare = Math.abs(target - entry);
+        const maxRiskDollars = positionSize * (riskPercent / 100);
+        const shares = maxRiskDollars / riskPerShare;
+        
+        const totalRisk = shares * riskPerShare;
+        const totalReward = shares * rewardPerShare;
+        const rrRatio = totalReward / totalRisk;
+        
+        return {
+          riskAmount: totalRisk,
+          rewardAmount: totalReward,
+          riskRewardRatio: rrRatio,
+          shares: shares,
+          isValid: true
+        };
+      };
+
       useEffect(() => {
+        if (analysis && analysis.currentPrice) {
+          setEntryPrice(analysis.currentPrice.toFixed(2));
+        }
+      }, [analysis]);
         const candles = generateData();
         setData(candles);
         setAnalysis(analyzeData(candles));
@@ -846,6 +887,101 @@
               </div>
               <div className="text-gray-600 mt-2">Score: {analysis.score}</div>
               <div className="text-gray-800 mt-1 text-lg">Price: ${analysis.currentPrice.toFixed(2)}</div>
+            </div>
+
+            <div className="bg-white p-6 rounded-lg shadow mb-8">
+              <h3 className="text-xl font-semibold mb-4">Position Size & Risk/Reward Calculator</h3>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Position Size ($)</label>
+                  <input
+                    type="number"
+                    value={positionSize}
+                    onChange={(e) => setPositionSize(parseFloat(e.target.value) || 0)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Risk (%)</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={riskPercent}
+                    onChange={(e) => setRiskPercent(parseFloat(e.target.value) || 0)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Entry Price ($)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={entryPrice}
+                    onChange={(e) => setEntryPrice(e.target.value)}
+                    placeholder="Entry price"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                  />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Stop Loss ($)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={stopLoss}
+                    onChange={(e) => setStopLoss(e.target.value)}
+                    placeholder="Stop loss price"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Profit Target ($)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={profitTarget}
+                    onChange={(e) => setProfitTarget(e.target.value)}
+                    placeholder="Profit target price"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                  />
+                </div>
+              </div>
+              
+              {(() => {
+                const calc = calculateRiskReward();
+                return calc.isValid ? (
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-gray-50 rounded-lg">
+                    <div className="text-center">
+                      <div className="text-sm text-gray-600 mb-1">Shares</div>
+                      <div className="text-xl font-bold text-blue-600">{calc.shares.toFixed(0)}</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-sm text-gray-600 mb-1">Risk Amount</div>
+                      <div className="text-xl font-bold text-red-600">${calc.riskAmount.toFixed(2)}</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-sm text-gray-600 mb-1">Reward Amount</div>
+                      <div className="text-xl font-bold text-green-600">${calc.rewardAmount.toFixed(2)}</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-sm text-gray-600 mb-1">R:R Ratio</div>
+                      <div className={`text-2xl font-bold ${calc.riskRewardRatio >= 2 ? 'text-green-600' : calc.riskRewardRatio >= 1 ? 'text-yellow-600' : 'text-red-600'}`}>
+                        1:{calc.riskRewardRatio.toFixed(2)}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center text-gray-500 p-4">
+                    Enter all values to calculate risk/reward
+                  </div>
+                );
+              })()}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
