@@ -18,6 +18,40 @@
     const TradingApp = () => {
       const [data, setData] = useState([]);
       const [analysis, setAnalysis] = useState(null);
+      const [ticker, setTicker] = useState('BTCUSDT');
+      const [loading, setLoading] = useState(false);
+      const [error, setError] = useState(null);
+      const [dataSource, setDataSource] = useState('demo');
+
+      const fetchRealData = async (symbol) => {
+        setLoading(true);
+        setError(null);
+        try {
+          const response = await fetch(
+            `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=1h&limit=50`
+          );
+          
+          if (!response.ok) {
+            throw new Error('Failed to fetch data. Check if ticker is valid (e.g., BTCUSDT, ETHUSDT)');
+          }
+          
+          const binanceData = await response.json();
+          const candles = binanceData.map(candle => ({
+            open: parseFloat(candle[1]),
+            high: parseFloat(candle[2]),
+            low: parseFloat(candle[3]),
+            close: parseFloat(candle[4]),
+            volume: parseFloat(candle[5])
+          }));
+          
+          setData(candles);
+          setAnalysis(analyzeData(candles));
+        } catch (err) {
+          setError(err.message);
+        } finally {
+          setLoading(false);
+        }
+      };
 
       const generateData = () => {
         const candles = [];
@@ -195,15 +229,30 @@
       };
 
       useEffect(() => {
-        const candles = generateData();
-        setData(candles);
-        setAnalysis(analyzeData(candles));
+        if (dataSource === 'demo') {
+          const candles = generateData();
+          setData(candles);
+          setAnalysis(analyzeData(candles));
+        } else {
+          fetchRealData(ticker);
+        }
       }, []);
 
       const refresh = () => {
-        const candles = generateData();
-        setData(candles);
-        setAnalysis(analyzeData(candles));
+        if (dataSource === 'demo') {
+          const candles = generateData();
+          setData(candles);
+          setAnalysis(analyzeData(candles));
+        } else {
+          fetchRealData(ticker);
+        }
+      };
+
+      const handleSearch = (e) => {
+        e.preventDefault();
+        if (dataSource === 'live') {
+          fetchRealData(ticker);
+        }
       };
 
       if (!analysis) return <div className="p-8">Loading...</div>;
@@ -228,6 +277,77 @@
               <button onClick={refresh} className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
                 Refresh
               </button>
+            </div>
+
+            <div className="bg-white p-6 rounded-lg shadow mb-8">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Data Source</label>
+                  <select 
+                    value={dataSource}
+                    onChange={(e) => {
+                      setDataSource(e.target.value);
+                      setError(null);
+                      if (e.target.value === 'demo') {
+                        const candles = generateData();
+                        setData(candles);
+                        setAnalysis(analyzeData(candles));
+                      }
+                    }}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="demo">Demo Data</option>
+                    <option value="live">Live Data (Binance)</option>
+                  </select>
+                </div>
+
+                {dataSource === 'live' && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">Ticker Symbol</label>
+                      <input 
+                        type="text"
+                        value={ticker}
+                        onChange={(e) => setTicker(e.target.value.toUpperCase())}
+                        placeholder="BTCUSDT"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        onKeyPress={(e) => e.key === 'Enter' && handleSearch(e)}
+                      />
+                    </div>
+
+                    <div className="flex items-end">
+                      <button 
+                        onClick={handleSearch}
+                        disabled={loading}
+                        className="w-full px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-semibold"
+                      >
+                        {loading ? 'Loading...' : 'Search'}
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {dataSource === 'live' && (
+                <div className="mt-4">
+                  <p className="text-sm text-gray-600">
+                    <strong>Popular tickers:</strong> BTCUSDT, ETHUSDT, BNBUSDT, SOLUSDT, ADAUSDT, DOGEUSDT, XRPUSDT
+                  </p>
+                </div>
+              )}
+
+              {error && (
+                <div className="mt-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg">
+                  <p className="font-semibold">Error:</p>
+                  <p>{error}</p>
+                </div>
+              )}
+
+              {loading && (
+                <div className="mt-4 p-4 bg-blue-100 border border-blue-400 text-blue-700 rounded-lg">
+                  <p>Fetching data for {ticker}...</p>
+                </div>
+              )}
             </div>
 
             <div className={`p-8 rounded-lg shadow mb-8 border-2 ${getBg(analysis.overallSignal)}`}>
