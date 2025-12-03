@@ -323,7 +323,6 @@
       };
 
       const identifyStructureBreaks = (swingPoints, candles) => {
-        const structures = [];
         const lookbackDays = getLookbackDays(structureLookback);
         const lookbackMs = lookbackDays * 24 * 60 * 60 * 1000;
         const cutoffTime = Date.now() - lookbackMs;
@@ -333,165 +332,88 @@
         const highs = recentSwingPoints.filter(p => p.type === 'high');
         const lows = recentSwingPoints.filter(p => p.type === 'low');
         
+        // First pass: identify all potential structure points
+        const preliminaryStructures = [];
+        
+        // Identify HH and LH from highs
         for (let i = 1; i < highs.length; i++) {
           const currentHigh = highs[i];
           const prevHigh = highs[i - 1];
           
           if (currentHigh.price > prevHigh.price) {
-            let shouldFlag = true;
-            
-            const laterLowerHighs = highs.slice(i + 1).filter((h, idx) => {
-              const nextHigh = highs[i + 1 + idx];
-              return nextHigh && nextHigh.price < highs[i + idx].price;
+            preliminaryStructures.push({
+              ...currentHigh,
+              structure: 'HH',
+              color: '#10b981'
             });
-            
-            const laterLowerLows = lows.filter(l => l.time > currentHigh.time).filter((l, idx, arr) => {
-              if (idx === 0) return false;
-              return l.price < arr[idx - 1].price;
-            });
-            
-            for (const lh of laterLowerHighs) {
-              if (Math.abs(currentHigh.price - lh.price) / currentHigh.price <= 0.05) {
-                shouldFlag = false;
-                break;
-              }
-            }
-            
-            if (shouldFlag) {
-              for (const ll of laterLowerLows) {
-                if (Math.abs(currentHigh.price - ll.price) / currentHigh.price <= 0.05) {
-                  shouldFlag = false;
-                  break;
-                }
-              }
-            }
-            
-            if (shouldFlag) {
-              structures.push({
-                ...currentHigh,
-                structure: 'HH',
-                color: '#10b981'
-              });
-            }
           } else if (currentHigh.price < prevHigh.price) {
-            let shouldFlag = true;
-            
-            const laterHigherHighs = highs.slice(i + 1).filter((h, idx) => {
-              const nextHigh = highs[i + 1 + idx];
-              return nextHigh && nextHigh.price > highs[i + idx].price;
+            preliminaryStructures.push({
+              ...currentHigh,
+              structure: 'LH',
+              color: '#ef4444'
             });
-            
-            const laterHigherLows = lows.filter(l => l.time > currentHigh.time).filter((l, idx, arr) => {
-              if (idx === 0) return false;
-              return l.price > arr[idx - 1].price;
-            });
-            
-            for (const hh of laterHigherHighs) {
-              if (Math.abs(currentHigh.price - hh.price) / currentHigh.price <= 0.05) {
-                shouldFlag = false;
-                break;
-              }
-            }
-            
-            if (shouldFlag) {
-              for (const hl of laterHigherLows) {
-                if (Math.abs(currentHigh.price - hl.price) / currentHigh.price <= 0.05) {
-                  shouldFlag = false;
-                  break;
-                }
-              }
-            }
-            
-            if (shouldFlag) {
-              structures.push({
-                ...currentHigh,
-                structure: 'LH',
-                color: '#ef4444'
-              });
-            }
           }
         }
         
+        // Identify HL and LL from lows
         for (let i = 1; i < lows.length; i++) {
           const currentLow = lows[i];
           const prevLow = lows[i - 1];
           
           if (currentLow.price > prevLow.price) {
-            let shouldFlag = true;
-            
-            const laterLowerHighs = highs.filter(h => h.time > currentLow.time).filter((h, idx, arr) => {
-              if (idx === 0) return false;
-              return h.price < arr[idx - 1].price;
+            preliminaryStructures.push({
+              ...currentLow,
+              structure: 'HL',
+              color: '#10b981'
             });
-            
-            const laterLowerLows = lows.slice(i + 1).filter((l, idx) => {
-              const nextLow = lows[i + 1 + idx];
-              return nextLow && nextLow.price < lows[i + idx].price;
-            });
-            
-            for (const lh of laterLowerHighs) {
-              if (Math.abs(currentLow.price - lh.price) / currentLow.price <= 0.05) {
-                shouldFlag = false;
-                break;
-              }
-            }
-            
-            if (shouldFlag) {
-              for (const ll of laterLowerLows) {
-                if (Math.abs(currentLow.price - ll.price) / currentLow.price <= 0.05) {
-                  shouldFlag = false;
-                  break;
-                }
-              }
-            }
-            
-            if (shouldFlag) {
-              structures.push({
-                ...currentLow,
-                structure: 'HL',
-                color: '#10b981'
-              });
-            }
           } else if (currentLow.price < prevLow.price) {
-            let shouldFlag = true;
-            
-            const laterHigherHighs = highs.filter(h => h.time > currentLow.time).filter((h, idx, arr) => {
-              if (idx === 0) return false;
-              return h.price > arr[idx - 1].price;
+            preliminaryStructures.push({
+              ...currentLow,
+              structure: 'LL',
+              color: '#ef4444'
             });
-            
-            const laterHigherLows = lows.slice(i + 1).filter((l, idx) => {
-              const nextLow = lows[i + 1 + idx];
-              return nextLow && nextLow.price > lows[i + idx].price;
-            });
-            
-            for (const hh of laterHigherHighs) {
-              if (Math.abs(currentLow.price - hh.price) / currentLow.price <= 0.05) {
-                shouldFlag = false;
-                break;
-              }
-            }
-            
-            if (shouldFlag) {
-              for (const hl of laterHigherLows) {
-                if (Math.abs(currentLow.price - hl.price) / currentLow.price <= 0.05) {
-                  shouldFlag = false;
-                  break;
-                }
-              }
-            }
-            
-            if (shouldFlag) {
-              structures.push({
-                ...currentLow,
-                structure: 'LL',
-                color: '#ef4444'
-              });
-            }
           }
         }
         
-        return structures;
+        // Sort all structures by time
+        preliminaryStructures.sort((a, b) => a.time - b.time);
+        
+        // Second pass: filter based on the rules
+        const finalStructures = [];
+        
+        for (let i = 0; i < preliminaryStructures.length; i++) {
+          const current = preliminaryStructures[i];
+          const prev = i > 0 ? preliminaryStructures[i - 1] : null;
+          const next = i < preliminaryStructures.length - 1 ? preliminaryStructures[i + 1] : null;
+          
+          let shouldMark = true;
+          
+          // Rule 1: If a LH is preceded most recently by a HL and the immediate next swing point is another HL, do not mark the LH
+          if (current.structure === 'LH' && prev && prev.structure === 'HL' && next && next.structure === 'HL') {
+            shouldMark = false;
+          }
+          
+          // Rule 2: If a HL is preceded most recently by a LH and the immediate next swing point is another LH, do not mark the HL
+          if (current.structure === 'HL' && prev && prev.structure === 'LH' && next && next.structure === 'LH') {
+            shouldMark = false;
+          }
+          
+          // Rule 3: If a LL is preceded most recently by a HH and the immediate next swing point is another HH, do not mark the LL
+          if (current.structure === 'LL' && prev && prev.structure === 'HH' && next && next.structure === 'HH') {
+            shouldMark = false;
+          }
+          
+          // Rule 4: If a HH is preceded most recently by a LL and the immediate next swing point is another HH, do not mark the HH
+          if (current.structure === 'HH' && prev && prev.structure === 'LL' && next && next.structure === 'HH') {
+            shouldMark = false;
+          }
+          
+          if (shouldMark) {
+            finalStructures.push(current);
+          }
+        }
+        
+        return finalStructures;
       };
 
       const analyzeData = (candles) => {
@@ -614,50 +536,76 @@
         
         const showTime = timeframe === '5min' || timeframe === '15min' || timeframe === 'hour';
         
-        // Main candlestick chart
+        // Main candlestick chart with TradingView-like settings
         const chart = window.LightweightCharts.createChart(container, {
           width: container.clientWidth,
           height: 400,
           layout: {
-            background: { color: '#ffffff' },
-            textColor: '#333'
+            background: { type: 'solid', color: '#131722' },
+            textColor: '#d1d4dc'
           },
           grid: {
-            vertLines: { color: '#f0f0f0' },
-            horzLines: { color: '#f0f0f0' }
+            vertLines: { color: '#1e222d' },
+            horzLines: { color: '#1e222d' }
           },
           crosshair: {
-            mode: window.LightweightCharts.CrosshairMode.Normal
+            mode: window.LightweightCharts.CrosshairMode.Normal,
+            vertLine: {
+              color: '#758696',
+              width: 1,
+              style: window.LightweightCharts.LineStyle.Dashed,
+              labelBackgroundColor: '#2a2e39'
+            },
+            horzLine: {
+              color: '#758696',
+              width: 1,
+              style: window.LightweightCharts.LineStyle.Dashed,
+              labelBackgroundColor: '#2a2e39'
+            }
           },
           rightPriceScale: {
-            borderColor: '#d1d4dc'
+            borderColor: '#2a2e39',
+            scaleMargins: {
+              top: 0.1,
+              bottom: 0.1
+            }
           },
           timeScale: {
-            borderColor: '#d1d4dc',
+            borderColor: '#2a2e39',
             timeVisible: showTime,
             secondsVisible: false,
-            lockVisibleTimeRangeOnResize: true
+            rightOffset: 12,
+            barSpacing: 6,
+            fixLeftEdge: false,
+            fixRightEdge: false,
+            lockVisibleTimeRangeOnResize: true,
+            rightBarStaysOnScroll: true,
+            shiftVisibleRangeOnNewBar: true
           },
           handleScroll: {
             mouseWheel: true,
             pressedMouseMove: true,
             horzTouchDrag: true,
-            vertTouchDrag: true
+            vertTouchDrag: false
           },
           handleScale: {
-            axisPressedMouseMove: true,
+            axisPressedMouseMove: {
+              time: true,
+              price: false
+            },
+            axisDoubleClickReset: true,
             mouseWheel: true,
             pinch: true
           }
         });
 
         const candlestickSeries = chart.addCandlestickSeries({
-          upColor: '#10b981',
-          downColor: '#ef4444',
-          borderUpColor: '#10b981',
-          borderDownColor: '#ef4444',
-          wickUpColor: '#10b981',
-          wickDownColor: '#ef4444'
+          upColor: '#26a69a',
+          downColor: '#ef5350',
+          borderUpColor: '#26a69a',
+          borderDownColor: '#ef5350',
+          wickUpColor: '#26a69a',
+          wickDownColor: '#ef5350'
         });
 
         const chartData = data.map((candle) => ({
@@ -689,7 +637,7 @@
             
             const lineSeries = chart.addLineSeries({
               color: structure.color,
-              lineWidth: 2,
+              lineWidth: 1,
               lineStyle: window.LightweightCharts.LineStyle.Dashed,
               crosshairMarkerVisible: false,
               lastValueVisible: true,
@@ -705,7 +653,7 @@
 
         chart.timeScale().fitContent();
 
-        // Create MACD chart below
+        // Create MACD chart below with matching TradingView style
         const macdContainer = document.getElementById('macd-chart-container');
         if (macdContainer) {
           macdContainer.innerHTML = '';
@@ -714,33 +662,58 @@
             width: container.clientWidth,
             height: 150,
             layout: {
-              background: { color: '#ffffff' },
-              textColor: '#333'
+              background: { type: 'solid', color: '#131722' },
+              textColor: '#d1d4dc'
             },
             grid: {
-              vertLines: { color: '#f0f0f0' },
-              horzLines: { color: '#f0f0f0' }
+              vertLines: { color: '#1e222d' },
+              horzLines: { color: '#1e222d' }
             },
             crosshair: {
-              mode: window.LightweightCharts.CrosshairMode.Normal
+              mode: window.LightweightCharts.CrosshairMode.Normal,
+              vertLine: {
+                color: '#758696',
+                width: 1,
+                style: window.LightweightCharts.LineStyle.Dashed,
+                labelBackgroundColor: '#2a2e39'
+              },
+              horzLine: {
+                color: '#758696',
+                width: 1,
+                style: window.LightweightCharts.LineStyle.Dashed,
+                labelBackgroundColor: '#2a2e39'
+              }
             },
             rightPriceScale: {
-              borderColor: '#d1d4dc'
+              borderColor: '#2a2e39',
+              scaleMargins: {
+                top: 0.1,
+                bottom: 0.1
+              }
             },
             timeScale: {
-              borderColor: '#d1d4dc',
+              borderColor: '#2a2e39',
               timeVisible: showTime,
               secondsVisible: false,
-              visible: true
+              rightOffset: 12,
+              barSpacing: 6,
+              fixLeftEdge: false,
+              fixRightEdge: false,
+              visible: true,
+              rightBarStaysOnScroll: true
             },
             handleScroll: {
               mouseWheel: true,
               pressedMouseMove: true,
               horzTouchDrag: true,
-              vertTouchDrag: true
+              vertTouchDrag: false
             },
             handleScale: {
-              axisPressedMouseMove: true,
+              axisPressedMouseMove: {
+                time: true,
+                price: false
+              },
+              axisDoubleClickReset: true,
               mouseWheel: true,
               pinch: true
             }
@@ -758,7 +731,9 @@
           const macdLineSeries = macdChart.addLineSeries({
             color: '#2962FF',
             lineWidth: 2,
-            title: 'MACD'
+            title: 'MACD',
+            crosshairMarkerVisible: true,
+            crosshairMarkerRadius: 4
           });
 
           const macdLineData = macdLine.map((val, i) => ({
@@ -771,7 +746,9 @@
           const signalLineSeries = macdChart.addLineSeries({
             color: '#FF6D00',
             lineWidth: 2,
-            title: 'Signal'
+            title: 'Signal',
+            crosshairMarkerVisible: true,
+            crosshairMarkerRadius: 4
           });
 
           const signalLineData = signalLine.map((val, i) => ({
@@ -782,7 +759,8 @@
 
           // Histogram (green/red bars)
           const histogramSeries = macdChart.addHistogramSeries({
-            title: 'Histogram'
+            title: 'Histogram',
+            priceLineVisible: false
           });
 
           const histogramData = histogram.map((val, i) => ({
@@ -794,9 +772,9 @@
 
           // Zero line
           const zeroLineSeries = macdChart.addLineSeries({
-            color: '#787878',
+            color: '#4a4e59',
             lineWidth: 1,
-            lineStyle: window.LightweightCharts.LineStyle.Dashed,
+            lineStyle: window.LightweightCharts.LineStyle.Solid,
             crosshairMarkerVisible: false,
             lastValueVisible: false,
             priceLineVisible: false
@@ -811,16 +789,20 @@
           macdChart.timeScale().fitContent();
 
           // Sync the time scales
-          chart.timeScale().subscribeVisibleTimeRangeChange((timeRange) => {
-            if (timeRange) {
-              macdChart.timeScale().setVisibleRange(timeRange);
-            }
+          let isSyncing = false;
+          
+          chart.timeScale().subscribeVisibleLogicalRangeChange((logicalRange) => {
+            if (isSyncing || !logicalRange) return;
+            isSyncing = true;
+            macdChart.timeScale().setVisibleLogicalRange(logicalRange);
+            isSyncing = false;
           });
 
-          macdChart.timeScale().subscribeVisibleTimeRangeChange((timeRange) => {
-            if (timeRange) {
-              chart.timeScale().setVisibleRange(timeRange);
-            }
+          macdChart.timeScale().subscribeVisibleLogicalRangeChange((logicalRange) => {
+            if (isSyncing || !logicalRange) return;
+            isSyncing = true;
+            chart.timeScale().setVisibleLogicalRange(logicalRange);
+            isSyncing = false;
           });
 
           // Handle resize for MACD chart
@@ -1068,27 +1050,27 @@
               </div>
             </div>
 
-            <div className="bg-white p-6 rounded-lg shadow">
+            <div className="bg-gray-900 p-6 rounded-lg shadow">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xl font-semibold">Interactive Candlestick Chart</h3>
+                <h3 className="text-xl font-semibold text-white">Interactive Candlestick Chart</h3>
                 <button 
                   onClick={resetZoom}
-                  className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 text-sm"
+                  className="px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-600 text-sm"
                 >
                   Reset Zoom
                 </button>
               </div>
-              <div className="text-sm text-gray-600 mb-4">
-                💡 <strong>Scroll</strong> to zoom in/out • <strong>Click & drag</strong> to pan • <span className="text-green-600 font-semibold">Green</span> = bullish • <span className="text-red-600 font-semibold">Red</span> = bearish
+              <div className="text-sm text-gray-400 mb-4">
+                💡 <strong className="text-gray-300">Scroll</strong> to zoom in/out • <strong className="text-gray-300">Click & drag</strong> to pan • <span className="text-teal-400 font-semibold">Green</span> = bullish • <span className="text-red-400 font-semibold">Red</span> = bearish
                 <br />
-                📊 <strong>HH</strong> = Higher High • <strong>HL</strong> = Higher Low • <strong>LH</strong> = Lower High • <strong>LL</strong> = Lower Low (1% wick reversal detected)
+                📊 <strong className="text-gray-300">HH</strong> = Higher High • <strong className="text-gray-300">HL</strong> = Higher Low • <strong className="text-gray-300">LH</strong> = Lower High • <strong className="text-gray-300">LL</strong> = Lower Low (1% wick reversal detected)
               </div>
               <div ref={chartContainerRef} style={{width: '100%', height: '400px'}}></div>
               
-              <div className="mt-2 mb-2 flex items-center gap-4 text-sm text-gray-600">
-                <span className="font-semibold">MACD (12, 26, 9):</span>
+              <div className="mt-2 mb-2 flex items-center gap-4 text-sm text-gray-400">
+                <span className="font-semibold text-gray-300">MACD (12, 26, 9):</span>
                 <span className="flex items-center gap-1">
-                  <span className="w-3 h-0.5 bg-blue-600 inline-block"></span> MACD Line
+                  <span className="w-3 h-0.5 bg-blue-500 inline-block"></span> MACD Line
                 </span>
                 <span className="flex items-center gap-1">
                   <span className="w-3 h-0.5 bg-orange-500 inline-block"></span> Signal Line
@@ -1101,7 +1083,7 @@
               <div id="macd-chart-container" style={{width: '100%', height: '150px'}}></div>
               
               <div className="text-xs text-gray-500 mt-2">
-                Powered by <a href="https://www.tradingview.com/" target="_blank" rel="noopener" className="text-blue-600 hover:underline">TradingView</a>
+                Powered by <a href="https://www.tradingview.com/" target="_blank" rel="noopener" className="text-blue-400 hover:underline">TradingView</a>
               </div>
             </div>
           </div>
