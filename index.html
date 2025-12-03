@@ -237,35 +237,85 @@
 
       const findSwingPoints = (candles) => {
         const swingPoints = [];
-        const lookback = 5;
+        const lookforward = 5; // Number of candles to look forward for reversal confirmation
+        const reversalThreshold = 0.01; // 1% reversal threshold
         
-        for (let i = lookback; i < candles.length - lookback; i++) {
+        for (let i = 1; i < candles.length - lookforward; i++) {
           const current = candles[i];
-          const leftCandles = candles.slice(i - lookback, i);
-          const rightCandles = candles.slice(i + 1, i + lookback + 1);
+          const prevCandle = candles[i - 1];
           
-          const isSwingHigh = leftCandles.every(c => current.high >= c.high) && 
-                              rightCandles.every(c => current.high >= c.high);
-          
-          const isSwingLow = leftCandles.every(c => current.low <= c.low) && 
-                             rightCandles.every(c => current.low <= c.low);
-          
-          if (isSwingHigh) {
-            swingPoints.push({
-              index: i,
-              time: candles[i].time,
-              price: current.high,
-              type: 'high'
-            });
+          // Check for swing high - wick high that reverses by more than 1%
+          // The high should be higher than previous candle's high (making a local peak)
+          if (current.high > prevCandle.high) {
+            // Check if price reverses down by at least 1% from the wick high within next few candles
+            let maxReversal = 0;
+            let reversalConfirmed = false;
+            
+            for (let j = i; j <= Math.min(i + lookforward, candles.length - 1); j++) {
+              const futureCandle = candles[j];
+              // Calculate reversal from the wick high
+              const reversalFromHigh = (current.high - futureCandle.low) / current.high;
+              maxReversal = Math.max(maxReversal, reversalFromHigh);
+              
+              if (reversalFromHigh >= reversalThreshold) {
+                reversalConfirmed = true;
+                break;
+              }
+            }
+            
+            // Also verify this is a local high (higher than surrounding candles)
+            const isLocalHigh = candles.slice(Math.max(0, i - 3), i).every(c => current.high >= c.high);
+            
+            if (reversalConfirmed && isLocalHigh) {
+              // Avoid duplicate swing highs too close together
+              const recentSwingHigh = swingPoints.filter(p => p.type === 'high').slice(-1)[0];
+              if (!recentSwingHigh || i - recentSwingHigh.index >= 3) {
+                swingPoints.push({
+                  index: i,
+                  time: candles[i].time,
+                  price: current.high,
+                  type: 'high',
+                  reversalPercent: (maxReversal * 100).toFixed(2)
+                });
+              }
+            }
           }
           
-          if (isSwingLow) {
-            swingPoints.push({
-              index: i,
-              time: candles[i].time,
-              price: current.low,
-              type: 'low'
-            });
+          // Check for swing low - wick low that reverses by more than 1%
+          // The low should be lower than previous candle's low (making a local trough)
+          if (current.low < prevCandle.low) {
+            // Check if price reverses up by at least 1% from the wick low within next few candles
+            let maxReversal = 0;
+            let reversalConfirmed = false;
+            
+            for (let j = i; j <= Math.min(i + lookforward, candles.length - 1); j++) {
+              const futureCandle = candles[j];
+              // Calculate reversal from the wick low
+              const reversalFromLow = (futureCandle.high - current.low) / current.low;
+              maxReversal = Math.max(maxReversal, reversalFromLow);
+              
+              if (reversalFromLow >= reversalThreshold) {
+                reversalConfirmed = true;
+                break;
+              }
+            }
+            
+            // Also verify this is a local low (lower than surrounding candles)
+            const isLocalLow = candles.slice(Math.max(0, i - 3), i).every(c => current.low <= c.low);
+            
+            if (reversalConfirmed && isLocalLow) {
+              // Avoid duplicate swing lows too close together
+              const recentSwingLow = swingPoints.filter(p => p.type === 'low').slice(-1)[0];
+              if (!recentSwingLow || i - recentSwingLow.index >= 3) {
+                swingPoints.push({
+                  index: i,
+                  time: candles[i].time,
+                  price: current.low,
+                  type: 'low',
+                  reversalPercent: (maxReversal * 100).toFixed(2)
+                });
+              }
+            }
           }
         }
         
@@ -564,9 +614,10 @@
         
         const showTime = timeframe === '5min' || timeframe === '15min' || timeframe === 'hour';
         
+        // Main candlestick chart
         const chart = window.LightweightCharts.createChart(container, {
           width: container.clientWidth,
-          height: 500,
+          height: 400,
           layout: {
             background: { color: '#ffffff' },
             textColor: '#333'
@@ -654,23 +705,167 @@
 
         chart.timeScale().fitContent();
 
+        // Create MACD chart below
+        const macdContainer = document.getElementById('macd-chart-container');
+        if (macdContainer) {
+          macdContainer.innerHTML = '';
+          
+          const macdChart = window.LightweightCharts.createChart(macdContainer, {
+            width: container.clientWidth,
+            height: 150,
+            layout: {
+              background: { color: '#ffffff' },
+              textColor: '#333'
+            },
+            grid: {
+              vertLines: { color: '#f0f0f0' },
+              horzLines: { color: '#f0f0f0' }
+            },
+            crosshair: {
+              mode: window.LightweightCharts.CrosshairMode.Normal
+            },
+            rightPriceScale: {
+              borderColor: '#d1d4dc'
+            },
+            timeScale: {
+              borderColor: '#d1d4dc',
+              timeVisible: showTime,
+              secondsVisible: false,
+              visible: true
+            },
+            handleScroll: {
+              mouseWheel: true,
+              pressedMouseMove: true,
+              horzTouchDrag: true,
+              vertTouchDrag: true
+            },
+            handleScale: {
+              axisPressedMouseMove: true,
+              mouseWheel: true,
+              pinch: true
+            }
+          });
+
+          // Calculate MACD data
+          const closes = data.map(c => c.close);
+          const ema12 = calculateEMA(closes, 12);
+          const ema26 = calculateEMA(closes, 26);
+          const macdLine = ema12.map((val, i) => val - ema26[i]);
+          const signalLine = calculateEMA(macdLine, 9);
+          const histogram = macdLine.map((val, i) => val - signalLine[i]);
+
+          // MACD Line (blue)
+          const macdLineSeries = macdChart.addLineSeries({
+            color: '#2962FF',
+            lineWidth: 2,
+            title: 'MACD'
+          });
+
+          const macdLineData = macdLine.map((val, i) => ({
+            time: Math.floor(data[i].time / 1000),
+            value: val
+          }));
+          macdLineSeries.setData(macdLineData);
+
+          // Signal Line (orange)
+          const signalLineSeries = macdChart.addLineSeries({
+            color: '#FF6D00',
+            lineWidth: 2,
+            title: 'Signal'
+          });
+
+          const signalLineData = signalLine.map((val, i) => ({
+            time: Math.floor(data[i].time / 1000),
+            value: val
+          }));
+          signalLineSeries.setData(signalLineData);
+
+          // Histogram (green/red bars)
+          const histogramSeries = macdChart.addHistogramSeries({
+            title: 'Histogram'
+          });
+
+          const histogramData = histogram.map((val, i) => ({
+            time: Math.floor(data[i].time / 1000),
+            value: val,
+            color: val >= 0 ? '#26a69a' : '#ef5350'
+          }));
+          histogramSeries.setData(histogramData);
+
+          // Zero line
+          const zeroLineSeries = macdChart.addLineSeries({
+            color: '#787878',
+            lineWidth: 1,
+            lineStyle: window.LightweightCharts.LineStyle.Dashed,
+            crosshairMarkerVisible: false,
+            lastValueVisible: false,
+            priceLineVisible: false
+          });
+
+          const zeroLineData = data.map(candle => ({
+            time: Math.floor(candle.time / 1000),
+            value: 0
+          }));
+          zeroLineSeries.setData(zeroLineData);
+
+          macdChart.timeScale().fitContent();
+
+          // Sync the time scales
+          chart.timeScale().subscribeVisibleTimeRangeChange((timeRange) => {
+            if (timeRange) {
+              macdChart.timeScale().setVisibleRange(timeRange);
+            }
+          });
+
+          macdChart.timeScale().subscribeVisibleTimeRangeChange((timeRange) => {
+            if (timeRange) {
+              chart.timeScale().setVisibleRange(timeRange);
+            }
+          });
+
+          // Handle resize for MACD chart
+          const handleMacdResize = () => {
+            macdChart.applyOptions({ width: container.clientWidth });
+          };
+          window.addEventListener('resize', handleMacdResize);
+
+          // Store MACD chart reference for cleanup
+          chartRef.current = {
+            chart,
+            macdChart,
+            remove: () => {
+              window.removeEventListener('resize', handleResize);
+              window.removeEventListener('resize', handleMacdResize);
+              chart.remove();
+              macdChart.remove();
+            }
+          };
+        }
+
         const handleResize = () => {
           chart.applyOptions({ width: container.clientWidth });
         };
         window.addEventListener('resize', handleResize);
 
-        chartRef.current = {
-          chart,
-          remove: () => {
-            window.removeEventListener('resize', handleResize);
-            chart.remove();
-          }
-        };
+        if (!chartRef.current) {
+          chartRef.current = {
+            chart,
+            remove: () => {
+              window.removeEventListener('resize', handleResize);
+              chart.remove();
+            }
+          };
+        }
       };
 
       const resetZoom = () => {
-        if (chartRef.current && chartRef.current.chart) {
-          chartRef.current.chart.timeScale().fitContent();
+        if (chartRef.current) {
+          if (chartRef.current.chart) {
+            chartRef.current.chart.timeScale().fitContent();
+          }
+          if (chartRef.current.macdChart) {
+            chartRef.current.macdChart.timeScale().fitContent();
+          }
         }
       };
 
@@ -886,9 +1081,25 @@
               <div className="text-sm text-gray-600 mb-4">
                 💡 <strong>Scroll</strong> to zoom in/out • <strong>Click & drag</strong> to pan • <span className="text-green-600 font-semibold">Green</span> = bullish • <span className="text-red-600 font-semibold">Red</span> = bearish
                 <br />
-                📊 <strong>HH</strong> = Higher High • <strong>HL</strong> = Higher Low • <strong>LH</strong> = Lower High • <strong>LL</strong> = Lower Low
+                📊 <strong>HH</strong> = Higher High • <strong>HL</strong> = Higher Low • <strong>LH</strong> = Lower High • <strong>LL</strong> = Lower Low (1% wick reversal detected)
               </div>
-              <div ref={chartContainerRef} style={{width: '100%', height: '500px'}}></div>
+              <div ref={chartContainerRef} style={{width: '100%', height: '400px'}}></div>
+              
+              <div className="mt-2 mb-2 flex items-center gap-4 text-sm text-gray-600">
+                <span className="font-semibold">MACD (12, 26, 9):</span>
+                <span className="flex items-center gap-1">
+                  <span className="w-3 h-0.5 bg-blue-600 inline-block"></span> MACD Line
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="w-3 h-0.5 bg-orange-500 inline-block"></span> Signal Line
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="w-3 h-3 bg-teal-500 inline-block"></span>
+                  <span className="w-3 h-3 bg-red-400 inline-block"></span> Histogram
+                </span>
+              </div>
+              <div id="macd-chart-container" style={{width: '100%', height: '150px'}}></div>
+              
               <div className="text-xs text-gray-500 mt-2">
                 Powered by <a href="https://www.tradingview.com/" target="_blank" rel="noopener" className="text-blue-600 hover:underline">TradingView</a>
               </div>
