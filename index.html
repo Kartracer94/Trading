@@ -42,6 +42,7 @@
       const [dataSource, setDataSource] = useState('demo');
       const [timeframe, setTimeframe] = useState('day');
       const [structureLookback, setStructureLookback] = useState('6months');
+      const [hoveredCandle, setHoveredCandle] = useState(null);
       const chartContainerRef = useRef(null);
       const chartRef = useRef(null);
       const API_KEY = '8sJBoZDCpg92UTI_7APnqoFRPWsIJ7oj';
@@ -621,6 +622,45 @@
 
         candlestickSeries.setData(chartData);
 
+        // Add 9 EMA
+        const closes = data.map(c => c.close);
+        const ema9Values = calculateEMA(closes, 9);
+        const ema9Series = chart.addLineSeries({
+          color: '#f59e0b',
+          lineWidth: 2,
+          crosshairMarkerVisible: true,
+          crosshairMarkerRadius: 4,
+          lastValueVisible: true,
+          priceLineVisible: false,
+          title: '9 EMA'
+        });
+        
+        const ema9Data = ema9Values.map((val, i) => ({
+          time: Math.floor(data[i].time / 1000),
+          value: val
+        }));
+        ema9Series.setData(ema9Data);
+
+        // Crosshair move handler for OHLC display
+        chart.subscribeCrosshairMove((param) => {
+          if (param.time) {
+            const candleData = param.seriesData.get(candlestickSeries);
+            const emaData = param.seriesData.get(ema9Series);
+            if (candleData) {
+              setHoveredCandle({
+                time: param.time,
+                open: candleData.open,
+                high: candleData.high,
+                low: candleData.low,
+                close: candleData.close,
+                ema9: emaData ? emaData.value : null
+              });
+            }
+          } else {
+            setHoveredCandle(null);
+          }
+        });
+
         // Add structure markers
         if (analysis && analysis.structures && analysis.structures.length > 0) {
           const markers = analysis.structures.map(structure => ({
@@ -1054,7 +1094,7 @@
             </div>
 
             <div className="bg-gray-900 p-4 rounded-lg shadow overflow-hidden">
-              <div className="flex justify-between items-center mb-3">
+              <div className="flex justify-between items-center mb-2">
                 <h3 className="text-lg font-semibold text-white">Interactive Candlestick Chart</h3>
                 <button 
                   onClick={resetZoom}
@@ -1063,9 +1103,27 @@
                   Reset Zoom
                 </button>
               </div>
-              <div className="text-xs text-gray-400 mb-3">
-                💡 <strong className="text-gray-300">Scroll</strong> to zoom • <strong className="text-gray-300">Drag</strong> to pan • <span className="text-teal-400 font-semibold">Green</span> = bullish • <span className="text-red-400 font-semibold">Red</span> = bearish
-                <span className="ml-2">📊 <strong className="text-gray-300">HH</strong> = Higher High • <strong className="text-gray-300">HL</strong> = Higher Low • <strong className="text-gray-300">LH</strong> = Lower High • <strong className="text-gray-300">LL</strong> = Lower Low</span>
+              <div className="text-xs text-gray-300 mb-2 font-mono h-5">
+                {hoveredCandle ? (
+                  <span className="flex gap-4">
+                    <span>
+                      {new Date(hoveredCandle.time * 1000).toLocaleDateString('en-US', { 
+                        year: 'numeric', 
+                        month: 'short', 
+                        day: 'numeric',
+                        hour: timeframe === '5min' || timeframe === '15min' || timeframe === 'hour' ? '2-digit' : undefined,
+                        minute: timeframe === '5min' || timeframe === '15min' || timeframe === 'hour' ? '2-digit' : undefined
+                      })}
+                    </span>
+                    <span>O: <span className={hoveredCandle.open <= hoveredCandle.close ? 'text-teal-400' : 'text-red-400'}>{hoveredCandle.open.toFixed(2)}</span></span>
+                    <span>H: <span className="text-teal-400">{hoveredCandle.high.toFixed(2)}</span></span>
+                    <span>L: <span className="text-red-400">{hoveredCandle.low.toFixed(2)}</span></span>
+                    <span>C: <span className={hoveredCandle.close >= hoveredCandle.open ? 'text-teal-400' : 'text-red-400'}>{hoveredCandle.close.toFixed(2)}</span></span>
+                    {hoveredCandle.ema9 && <span>9EMA: <span className="text-amber-400">{hoveredCandle.ema9.toFixed(2)}</span></span>}
+                  </span>
+                ) : (
+                  <span className="text-gray-500">Hover over chart for OHLC data</span>
+                )}
               </div>
               <div ref={chartContainerRef} className="w-full" style={{height: '350px'}}></div>
               
