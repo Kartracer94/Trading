@@ -256,7 +256,7 @@
       const findSwingPoints = (candles) => {
         const swingPoints = [];
         const lookback = 3; // Number of candles to look back and forward
-        const reversalThreshold = 0.01; // 1% reversal threshold
+        const reversalThreshold = 0.03; // 3% reversal threshold
         
         for (let i = lookback; i < candles.length - lookback; i++) {
           const current = candles[i];
@@ -270,7 +270,7 @@
           const isHighestHigh = surroundingCandles.every(c => current.high >= c.high);
           
           if (isHighestHigh) {
-            // Check if price reverses down by at least 1% from the wick high
+            // Check if price reverses down by at least 3% from the wick high
             let reversalConfirmed = false;
             for (const rc of rightCandles) {
               const reversalFromHigh = (current.high - rc.low) / current.high;
@@ -298,7 +298,7 @@
           const isLowestLow = surroundingCandles.every(c => current.low <= c.low);
           
           if (isLowestLow) {
-            // Check if price reverses up by at least 1% from the wick low
+            // Check if price reverses up by at least 3% from the wick low
             let reversalConfirmed = false;
             for (const rc of rightCandles) {
               const reversalFromLow = (rc.high - current.low) / current.low;
@@ -673,23 +673,41 @@
           
           candlestickSeries.setMarkers(markers);
 
-          // Add horizontal lines for each structure
+          // Add horizontal lines for each structure - stop at first candle that touches
           analysis.structures.forEach(structure => {
             const structureTime = Math.floor(structure.time / 1000);
-            const lastTime = Math.floor(data[data.length - 1].time / 1000);
+            const structurePrice = structure.price;
+            
+            // Find the first candle after the structure point that touches the line
+            let endTime = Math.floor(data[data.length - 1].time / 1000); // Default to end
+            
+            for (let i = 0; i < data.length; i++) {
+              const candleTime = Math.floor(data[i].time / 1000);
+              
+              // Only check candles after the structure point
+              if (candleTime > structureTime) {
+                const candle = data[i];
+                
+                // Check if the candle touches the line (price is between low and high)
+                if (candle.low <= structurePrice && candle.high >= structurePrice) {
+                  endTime = candleTime;
+                  break;
+                }
+              }
+            }
             
             const lineSeries = chart.addLineSeries({
               color: structure.color,
               lineWidth: 1,
               lineStyle: window.LightweightCharts.LineStyle.Dashed,
               crosshairMarkerVisible: false,
-              lastValueVisible: true,
+              lastValueVisible: false,
               priceLineVisible: false
             });
             
             lineSeries.setData([
-              { time: structureTime, value: structure.price },
-              { time: lastTime, value: structure.price }
+              { time: structureTime, value: structurePrice },
+              { time: endTime, value: structurePrice }
             ]);
           });
         }
