@@ -67,7 +67,7 @@
           const fromStr = fromDate.toISOString().split('T')[0];
           const toStr = toDate.toISOString().split('T')[0];
           
-          const url = `https://api.massive.com/v2/aggs/ticker/${symbol}/range/${tfParams.multiplier}/${tfParams.timespan}/${fromStr}/${toStr}?adjusted=true&sort=asc&limit=50000&apiKey=${API_KEY}`;
+          const url = `https://api.polygon.io/v2/aggs/ticker/${symbol}/range/${tfParams.multiplier}/${tfParams.timespan}/${fromStr}/${toStr}?adjusted=true&sort=asc&limit=50000&apiKey=${API_KEY}`;
           
           const response = await fetch(url);
           
@@ -82,7 +82,7 @@
           }
           
           const candles = result.results.map(bar => ({
-            time: bar.t, // Unix timestamp in milliseconds
+            time: bar.t,
             open: bar.o,
             high: bar.h,
             low: bar.l,
@@ -115,7 +115,7 @@
           const volume = Math.random() * 1000000 + 500000;
           
           candles.push({ 
-            time: now - ((49 - i) * dayInMs), // Unix timestamp in ms
+            time: now - ((49 - i) * dayInMs),
             open, 
             high, 
             low, 
@@ -186,13 +186,11 @@
 
         const currentPrice = candles[candles.length - 1].close;
         
-        // Find most recent structures
         const recentLH = structures.filter(s => s.structure === 'LH').sort((a, b) => b.time - a.time)[0];
         const recentHL = structures.filter(s => s.structure === 'HL').sort((a, b) => b.time - a.time)[0];
         const recentHH = structures.filter(s => s.structure === 'HH').sort((a, b) => b.time - a.time);
         const recentLL = structures.filter(s => s.structure === 'LL').sort((a, b) => b.time - a.time);
         
-        // Bullish trend: Price breaks above a previous Lower High (LH)
         if (recentLH && currentPrice > recentLH.price) {
           return {
             trend: 'BULLISH',
@@ -201,7 +199,6 @@
           };
         }
         
-        // Bearish trend: Price breaks below a previous Higher Low (HL)
         if (recentHL && currentPrice < recentHL.price) {
           return {
             trend: 'BEARISH',
@@ -210,13 +207,11 @@
           };
         }
         
-        // Check overall structure pattern for trend
         const hasRecentHH = recentHH.length > 0 && recentHH[0].time > Date.now() - (30 * 24 * 60 * 60 * 1000);
         const hasRecentHL = recentHL && recentHL.time > Date.now() - (30 * 24 * 60 * 60 * 1000);
         const hasRecentLH = recentLH && recentLH.time > Date.now() - (30 * 24 * 60 * 60 * 1000);
         const hasRecentLL = recentLL.length > 0 && recentLL[0].time > Date.now() - (30 * 24 * 60 * 60 * 1000);
         
-        // Higher Highs and Higher Lows = Uptrend
         if (hasRecentHH && hasRecentHL) {
           return {
             trend: 'BULLISH',
@@ -225,7 +220,6 @@
           };
         }
         
-        // Lower Highs and Lower Lows = Downtrend
         if (hasRecentLH && hasRecentLL) {
           return {
             trend: 'BEARISH',
@@ -243,18 +237,16 @@
 
       const findSwingPoints = (candles) => {
         const swingPoints = [];
-        const lookback = 5; // Number of candles to look back/forward for swing detection
+        const lookback = 5;
         
         for (let i = lookback; i < candles.length - lookback; i++) {
           const current = candles[i];
           const leftCandles = candles.slice(i - lookback, i);
           const rightCandles = candles.slice(i + 1, i + lookback + 1);
           
-          // Check for swing high (wick high is highest among surrounding candles)
           const isSwingHigh = leftCandles.every(c => current.high >= c.high) && 
                               rightCandles.every(c => current.high >= c.high);
           
-          // Check for swing low (wick low is lowest among surrounding candles)
           const isSwingLow = leftCandles.every(c => current.low <= c.low) && 
                              rightCandles.every(c => current.low <= c.low);
           
@@ -286,36 +278,28 @@
         const lookbackMs = lookbackDays * 24 * 60 * 60 * 1000;
         const cutoffTime = Date.now() - lookbackMs;
         
-        // Filter swing points within lookback period
         const recentSwingPoints = swingPoints.filter(p => p.time >= cutoffTime);
         
-        // Separate highs and lows
         const highs = recentSwingPoints.filter(p => p.type === 'high');
         const lows = recentSwingPoints.filter(p => p.type === 'low');
         
-        // Identify Higher Highs and Lower Highs
         for (let i = 1; i < highs.length; i++) {
           const currentHigh = highs[i];
           const prevHigh = highs[i - 1];
           
           if (currentHigh.price > prevHigh.price) {
-            // This is a Higher High (HH)
-            // Check if HH price is within 5% of any more recent LH or LL
             let shouldFlag = true;
             
-            // Find all LH that came after this HH
             const laterLowerHighs = highs.slice(i + 1).filter((h, idx) => {
               const nextHigh = highs[i + 1 + idx];
               return nextHigh && nextHigh.price < highs[i + idx].price;
             });
             
-            // Find all LL that came after this HH
             const laterLowerLows = lows.filter(l => l.time > currentHigh.time).filter((l, idx, arr) => {
               if (idx === 0) return false;
               return l.price < arr[idx - 1].price;
             });
             
-            // Check if within 5% of any later LH or LL
             for (const lh of laterLowerHighs) {
               if (Math.abs(currentHigh.price - lh.price) / currentHigh.price <= 0.05) {
                 shouldFlag = false;
@@ -340,23 +324,18 @@
               });
             }
           } else if (currentHigh.price < prevHigh.price) {
-            // This is a Lower High (LH)
-            // Check if LH price is within 5% of any more recent HH or HL
             let shouldFlag = true;
             
-            // Find all HH that came after this LH
             const laterHigherHighs = highs.slice(i + 1).filter((h, idx) => {
               const nextHigh = highs[i + 1 + idx];
               return nextHigh && nextHigh.price > highs[i + idx].price;
             });
             
-            // Find all HL that came after this LH
             const laterHigherLows = lows.filter(l => l.time > currentHigh.time).filter((l, idx, arr) => {
               if (idx === 0) return false;
               return l.price > arr[idx - 1].price;
             });
             
-            // Check if within 5% of any later HH or HL
             for (const hh of laterHigherHighs) {
               if (Math.abs(currentHigh.price - hh.price) / currentHigh.price <= 0.05) {
                 shouldFlag = false;
@@ -383,29 +362,23 @@
           }
         }
         
-        // Identify Higher Lows and Lower Lows
         for (let i = 1; i < lows.length; i++) {
           const currentLow = lows[i];
           const prevLow = lows[i - 1];
           
           if (currentLow.price > prevLow.price) {
-            // This is a Higher Low (HL)
-            // Check if HL price is within 5% of any more recent LH or LL
             let shouldFlag = true;
             
-            // Find all LH that came after this HL
             const laterLowerHighs = highs.filter(h => h.time > currentLow.time).filter((h, idx, arr) => {
               if (idx === 0) return false;
               return h.price < arr[idx - 1].price;
             });
             
-            // Find all LL that came after this HL
             const laterLowerLows = lows.slice(i + 1).filter((l, idx) => {
               const nextLow = lows[i + 1 + idx];
               return nextLow && nextLow.price < lows[i + idx].price;
             });
             
-            // Check if within 5% of any later LH or LL
             for (const lh of laterLowerHighs) {
               if (Math.abs(currentLow.price - lh.price) / currentLow.price <= 0.05) {
                 shouldFlag = false;
@@ -430,23 +403,18 @@
               });
             }
           } else if (currentLow.price < prevLow.price) {
-            // This is a Lower Low (LL)
-            // Check if LL price is within 5% of any more recent HH or HL
             let shouldFlag = true;
             
-            // Find all HH that came after this LL
             const laterHigherHighs = highs.filter(h => h.time > currentLow.time).filter((h, idx, arr) => {
               if (idx === 0) return false;
               return h.price > arr[idx - 1].price;
             });
             
-            // Find all HL that came after this LL
             const laterHigherLows = lows.slice(i + 1).filter((l, idx) => {
               const nextLow = lows[i + 1 + idx];
               return nextLow && nextLow.price > lows[i + idx].price;
             });
             
-            // Check if within 5% of any later HH or HL
             for (const hh of laterHigherHighs) {
               if (Math.abs(currentLow.price - hh.price) / currentLow.price <= 0.05) {
                 shouldFlag = false;
@@ -482,8 +450,8 @@
         const pattern = detectCandlePattern(lastCandle);
         const swingPoints = findSwingPoints(candles);
         const structures = identifyStructureBreaks(swingPoints, candles);
+        const trendStructure = analyzeTrendStructure(structures, candles);
         
-        // Still find support/resistance for the summary cards
         const levels = swingPoints.filter(p => p.type === 'high' || p.type === 'low');
         
         const avgVolume = candles.reduce((sum, c) => sum + c.volume, 0) / candles.length;
@@ -556,52 +524,19 @@
           signals,
           avgVolume: avgVolume.toFixed(0),
           currentVolume: lastCandle.volume.toFixed(0),
-          structures // Add structure breaks to analysis
+          structures,
+          trendStructure
         };
       };
 
-      const calculateRiskReward = () => {
-        const entry = parseFloat(entryPrice);
-        const stop = parseFloat(stopLoss);
-        const target = parseFloat(profitTarget);
-        
-        if (!entry || !stop || !target) {
-          return {
-            riskAmount: 0,
-            rewardAmount: 0,
-            riskRewardRatio: 0,
-            isValid: false
-          };
-        }
-        
-        const riskPerShare = Math.abs(entry - stop);
-        const rewardPerShare = Math.abs(target - entry);
-        const maxRiskDollars = positionSize * (riskPercent / 100);
-        const shares = maxRiskDollars / riskPerShare;
-        
-        const totalRisk = shares * riskPerShare;
-        const totalReward = shares * rewardPerShare;
-        const rrRatio = totalReward / totalRisk;
-        
-        return {
-          riskAmount: totalRisk,
-          rewardAmount: totalReward,
-          riskRewardRatio: rrRatio,
-          shares: shares,
-          isValid: true
-        };
-      };
-
+      // Initialize with demo data on mount
       useEffect(() => {
-        if (analysis && analysis.currentPrice) {
-          setEntryPrice(analysis.currentPrice.toFixed(2));
-        }
-      }, [analysis]);
         const candles = generateData();
         setData(candles);
         setAnalysis(analyzeData(candles));
       }, []);
 
+      // Create chart when data changes
       useEffect(() => {
         if (data.length > 0 && chartContainerRef.current) {
           createTradingViewChart();
@@ -613,7 +548,7 @@
             chartRef.current = null;
           }
         };
-      }, [data]);
+      }, [data, analysis]);
 
       const createTradingViewChart = () => {
         if (!window.LightweightCharts) {
@@ -621,17 +556,14 @@
           return;
         }
 
-        // Remove existing chart
         if (chartRef.current) {
           chartRef.current.remove();
         }
 
         const container = chartContainerRef.current;
         
-        // Determine time visibility based on timeframe
         const showTime = timeframe === '5min' || timeframe === '15min' || timeframe === 'hour';
         
-        // Create chart
         const chart = window.LightweightCharts.createChart(container, {
           width: container.clientWidth,
           height: 500,
@@ -668,7 +600,6 @@
           }
         });
 
-        // Add candlestick series
         const candlestickSeries = chart.addCandlestickSeries({
           upColor: '#10b981',
           downColor: '#ef4444',
@@ -678,9 +609,8 @@
           wickDownColor: '#ef4444'
         });
 
-        // Format data for TradingView - convert ms timestamp to seconds
         const chartData = data.map((candle) => ({
-          time: Math.floor(candle.time / 1000), // Convert ms to seconds for TradingView
+          time: Math.floor(candle.time / 1000),
           open: candle.open,
           high: candle.high,
           low: candle.low,
@@ -689,13 +619,23 @@
 
         candlestickSeries.setData(chartData);
 
-        // Add structure break lines (HH, HL, LH, LL)
-        if (analysis && analysis.structures) {
+        // Add structure markers
+        if (analysis && analysis.structures && analysis.structures.length > 0) {
+          const markers = analysis.structures.map(structure => ({
+            time: Math.floor(structure.time / 1000),
+            position: structure.type === 'high' ? 'aboveBar' : 'belowBar',
+            color: structure.color,
+            shape: structure.type === 'high' ? 'arrowDown' : 'arrowUp',
+            text: structure.structure
+          }));
+          
+          candlestickSeries.setMarkers(markers);
+
+          // Add horizontal lines for each structure
           analysis.structures.forEach(structure => {
             const structureTime = Math.floor(structure.time / 1000);
             const lastTime = Math.floor(data[data.length - 1].time / 1000);
             
-            // Create horizontal line from structure point to end of chart
             const lineSeries = chart.addLineSeries({
               color: structure.color,
               lineWidth: 2,
@@ -705,29 +645,15 @@
               priceLineVisible: false
             });
             
-            // Draw line from the structure point to the right edge
             lineSeries.setData([
               { time: structureTime, value: structure.price },
               { time: lastTime, value: structure.price }
-            ]);
-            
-            // Add marker for the structure point
-            candlestickSeries.setMarkers([
-              ...candlestickSeries.markers() || [],
-              {
-                time: structureTime,
-                position: structure.type === 'high' ? 'aboveBar' : 'belowBar',
-                color: structure.color,
-                shape: structure.type === 'high' ? 'arrowDown' : 'arrowUp',
-                text: structure.structure
-              }
             ]);
           });
         }
 
         chart.timeScale().fitContent();
 
-        // Handle resize
         const handleResize = () => {
           chart.applyOptions({ width: container.clientWidth });
         };
